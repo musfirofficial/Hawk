@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790703062853,
+      "tag": "0000_sweet_chamber",
+      "breakpoints": true
+    }
+  ]
+}
