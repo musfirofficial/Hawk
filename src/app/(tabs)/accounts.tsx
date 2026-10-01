@@ -1,12 +1,6 @@
-import React from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function AccountsScreen() {
   return (
@@ -30,22 +24,18 @@ export default function AccountsScreen() {
         {/* Net Worth Summary */}
         <View className="bg-dark-surface p-5 rounded-3xl border border-dark-border mb-6">
           <Text className="text-dark-muted text-xs font-semibold uppercase tracking-wider">
-            Total Liquid Balance
+            Bank Balance
           </Text>
           <Text className="text-dark-text text-3xl font-extrabold mt-1">
-            $26,887.09
+            $2,250.00
           </Text>
-          <View className="flex-row items-center gap-4 mt-3 pt-3 border-t border-dark-border">
-            <View>
-              <Text className="text-dark-muted text-[11px]">Cash</Text>
-              <Text className="text-brand-income font-bold text-sm">$1,250.00</Text>
-            </View>
-            <View className="w-px h-6 bg-dark-border" />
-            <View>
-              <Text className="text-dark-muted text-[11px]">Bank</Text>
-              <Text className="text-brand-transfer font-bold text-sm">$25,637.09</Text>
-            </View>
-          </View>
+          <View className="flex-row items-center gap-4 mt-3 pt-3 border-t border-dark-border"></View>
+          <Text className="text-dark-muted text-xs font-semibold uppercase tracking-wider">
+            Cash Balance
+          </Text>
+          <Text className="text-dark-text text-3xl font-extrabold mt-1">
+            $1,250.00
+          </Text>
         </View>
 
         {/* Bank Accounts Section */}
@@ -61,12 +51,18 @@ export default function AccountsScreen() {
                   <Ionicons name="business" size={20} color="#38BDF8" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Chase Checking</Text>
-                  <Text className="text-dark-muted text-xs">Acc: •••• 4821</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Chase Checking
+                  </Text>
+                  <Text className="text-dark-muted text-xs">
+                    Acc: •••• 4821
+                  </Text>
                 </View>
               </View>
               <View className="items-end">
-                <Text className="text-dark-text font-bold text-base">$18,420.50</Text>
+                <Text className="text-dark-text font-bold text-base">
+                  $18,420.50
+                </Text>
                 <Text className="text-dark-muted text-[10px]">Primary</Text>
               </View>
             </View>
@@ -77,12 +73,18 @@ export default function AccountsScreen() {
                   <Ionicons name="card-outline" size={20} color="#38BDF8" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">High-Yield Savings</Text>
-                  <Text className="text-dark-muted text-xs">Acc: •••• 9104</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    High-Yield Savings
+                  </Text>
+                  <Text className="text-dark-muted text-xs">
+                    Acc: •••• 9104
+                  </Text>
                 </View>
               </View>
               <View className="items-end">
-                <Text className="text-dark-text font-bold text-base">$7,216.59</Text>
+                <Text className="text-dark-text font-bold text-base">
+                  $7,216.59
+                </Text>
                 <Text className="text-dark-muted text-[10px]">Savings</Text>
               </View>
             </View>
@@ -102,24 +104,36 @@ export default function AccountsScreen() {
                   <Ionicons name="wallet-outline" size={20} color="#22C55E" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Physical Wallet</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Physical Wallet
+                  </Text>
                   <Text className="text-dark-muted text-xs">Pocket Cash</Text>
                 </View>
               </View>
-              <Text className="text-dark-text font-bold text-base">$450.00</Text>
+              <Text className="text-dark-text font-bold text-base">
+                $450.00
+              </Text>
             </View>
 
             <View className="bg-dark-surface p-4 rounded-2xl border border-dark-border flex-row items-center justify-between">
               <View className="flex-row items-center gap-3">
                 <View className="w-11 h-11 rounded-2xl bg-brand-income/10 border border-brand-income/20 items-center justify-center">
-                  <Ionicons name="file-tray-full-outline" size={20} color="#22C55E" />
+                  <Ionicons
+                    name="file-tray-full-outline"
+                    size={20}
+                    color="#22C55E"
+                  />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Emergency Drawer Cash</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Emergency Drawer Cash
+                  </Text>
                   <Text className="text-dark-muted text-xs">Home Safe</Text>
                 </View>
               </View>
-              <Text className="text-dark-text font-bold text-base">$800.00</Text>
+              <Text className="text-dark-text font-bold text-base">
+                $800.00
+              </Text>
             </View>
           </View>
         </View>

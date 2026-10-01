@@ -1,12 +1,7 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function DebtsScreen() {
   const [activeTab, setActiveTab] = useState<"LENT" | "BORROWED">("LENT");
@@ -33,24 +28,38 @@ export default function DebtsScreen() {
         <View className="flex-row gap-3 mb-6">
           <View className="flex-1 bg-dark-surface p-4 rounded-3xl border border-dark-border">
             <View className="w-8 h-8 rounded-full bg-brand-lend/10 items-center justify-center mb-2">
-              <Ionicons name="arrow-up-circle-outline" size={20} color="#F59E0B" />
+              <Ionicons
+                name="arrow-up-circle-outline"
+                size={20}
+                color="#F59E0B"
+              />
             </View>
-            <Text className="text-dark-muted text-xs font-semibold">I Am Owed</Text>
+            <Text className="text-dark-muted text-xs font-semibold">
+              I Am Owed
+            </Text>
             <Text className="text-brand-lend text-xl font-extrabold mt-1">
               $1,450.00
             </Text>
-            <Text className="text-dark-muted text-[10px] mt-0.5">3 active loans</Text>
+            <Text className="text-dark-muted text-[10px] mt-0.5">
+              3 active loans
+            </Text>
           </View>
 
           <View className="flex-1 bg-dark-surface p-4 rounded-3xl border border-dark-border">
             <View className="w-8 h-8 rounded-full bg-brand-borrow/10 items-center justify-center mb-2">
-              <Ionicons name="arrow-down-circle-outline" size={20} color="#A855F7" />
+              <Ionicons
+                name="arrow-down-circle-outline"
+                size={20}
+                color="#A855F7"
+              />
             </View>
             <Text className="text-dark-muted text-xs font-semibold">I Owe</Text>
             <Text className="text-brand-borrow text-xl font-extrabold mt-1">
               $500.00
             </Text>
-            <Text className="text-dark-muted text-[10px] mt-0.5">1 borrowed debt</Text>
+            <Text className="text-dark-muted text-[10px] mt-0.5">
+              1 borrowed debt
+            </Text>
           </View>
         </View>
 
@@ -99,11 +108,15 @@ export default function DebtsScreen() {
                   <Text className="text-dark-text font-bold text-sm">
                     Henrik Jansen
                   </Text>
-                  <Text className="text-dark-muted text-xs">Due: Oct 15, 2026</Text>
+                  <Text className="text-dark-muted text-xs">
+                    Due: Oct 15, 2026
+                  </Text>
                 </View>
               </View>
               <View className="items-end">
-                <Text className="text-brand-lend font-bold text-base">$800.00</Text>
+                <Text className="text-brand-lend font-bold text-base">
+                  $800.00
+                </Text>
                 <View className="bg-brand-lend/10 px-2 py-0.5 rounded-full mt-0.5">
                   <Text className="text-brand-lend text-[10px] font-bold">
                     $350 Repaid
@@ -127,11 +140,15 @@ export default function DebtsScreen() {
                   <Text className="text-dark-text font-bold text-sm">
                     Matteo Ricci
                   </Text>
-                  <Text className="text-dark-muted text-xs">Due: Nov 01, 2026</Text>
+                  <Text className="text-dark-muted text-xs">
+                    Due: Nov 01, 2026
+                  </Text>
                 </View>
               </View>
               <View className="items-end">
-                <Text className="text-brand-lend font-bold text-base">$650.00</Text>
+                <Text className="text-brand-lend font-bold text-base">
+                  $650.00
+                </Text>
                 <View className="bg-dark-card px-2 py-0.5 rounded-full mt-0.5">
                   <Text className="text-dark-muted text-[10px] font-bold">
                     No repayments

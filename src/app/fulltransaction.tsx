@@ -1,13 +1,8 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function FullTransactionScreen() {
   const router = useRouter();
@@ -40,14 +35,20 @@ export default function FullTransactionScreen() {
           activeOpacity={0.7}
         >
           <View className="w-2.5 h-2.5 rounded-full bg-brand-accent" />
-          <Text className="text-dark-text text-xs font-bold">All Liquid Assets</Text>
+          <Text className="text-dark-text text-xs font-bold">
+            All Liquid Assets
+          </Text>
           <Ionicons name="chevron-down" size={14} color="#94A3B8" />
         </TouchableOpacity>
       </View>
 
       {/* Transaction Type Filter Pills */}
       <View className="px-5 mb-3">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="gap-2 flex-row">
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="gap-2 flex-row"
+        >
           {["ALL", "INCOME", "EXPENSE", "TRANSFER", "DEBTS"].map((tab) => (
             <TouchableOpacity
               key={tab}
@@ -89,7 +90,9 @@ export default function FullTransactionScreen() {
                   <Ionicons name="arrow-down" size={18} color="#22C55E" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Eva Novak</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Eva Novak
+                  </Text>
                   <Text className="text-dark-muted text-xs">Salary • Bank</Text>
                 </View>
               </View>
@@ -104,8 +107,12 @@ export default function FullTransactionScreen() {
                   <Ionicons name="trending-up" size={18} color="#22C55E" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Binance</Text>
-                  <Text className="text-dark-muted text-xs">Crypto P2P • Bank</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Binance
+                  </Text>
+                  <Text className="text-dark-muted text-xs">
+                    Crypto P2P • Bank
+                  </Text>
                 </View>
               </View>
               <Text className="text-brand-income font-bold text-base">
@@ -127,8 +134,12 @@ export default function FullTransactionScreen() {
                   <Ionicons name="repeat" size={18} color="#F59E0B" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Henrik Jansen</Text>
-                  <Text className="text-dark-muted text-xs">Debt Received • Cash</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Henrik Jansen
+                  </Text>
+                  <Text className="text-dark-muted text-xs">
+                    Debt Received • Cash
+                  </Text>
                 </View>
               </View>
               <Text className="text-brand-income font-bold text-base">
@@ -142,8 +153,12 @@ export default function FullTransactionScreen() {
                   <Ionicons name="film-outline" size={18} color="#F43F5E" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Multiplex Cinema</Text>
-                  <Text className="text-dark-muted text-xs">Entertainment • Bank</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Multiplex Cinema
+                  </Text>
+                  <Text className="text-dark-muted text-xs">
+                    Entertainment • Bank
+                  </Text>
                 </View>
               </View>
               <Text className="text-brand-expense font-bold text-base">
@@ -157,8 +172,12 @@ export default function FullTransactionScreen() {
                   <Ionicons name="shirt-outline" size={18} color="#F43F5E" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Nike Store</Text>
-                  <Text className="text-dark-muted text-xs">Shopping • Cash</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Nike Store
+                  </Text>
+                  <Text className="text-dark-muted text-xs">
+                    Shopping • Cash
+                  </Text>
                 </View>
               </View>
               <Text className="text-brand-expense font-bold text-base">
@@ -180,8 +199,12 @@ export default function FullTransactionScreen() {
                   <Ionicons name="arrow-down" size={18} color="#22C55E" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Matteo Ricci</Text>
-                  <Text className="text-dark-muted text-xs">Consulting • Bank</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Matteo Ricci
+                  </Text>
+                  <Text className="text-dark-muted text-xs">
+                    Consulting • Bank
+                  </Text>
                 </View>
               </View>
               <Text className="text-brand-income font-bold text-base">
@@ -195,8 +218,12 @@ export default function FullTransactionScreen() {
                   <Ionicons name="tv-outline" size={18} color="#F43F5E" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Megogo Subscription</Text>
-                  <Text className="text-dark-muted text-xs">Services • Bank</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Megogo Subscription
+                  </Text>
+                  <Text className="text-dark-muted text-xs">
+                    Services • Bank
+                  </Text>
                 </View>
               </View>
               <Text className="text-brand-expense font-bold text-base">

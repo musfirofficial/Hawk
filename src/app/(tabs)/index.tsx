@@ -1,17 +1,12 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [showBalance, setShowBalance] = useState(true);
+  const [showBalance, setShowBalance] = useState(false);
 
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-dark-bg">
@@ -27,11 +22,8 @@ export default function HomeScreen() {
               <Text className="text-dark-bg font-bold text-base">H</Text>
             </View>
             <View>
-              <Text className="text-dark-muted text-xs font-medium">
-                Welcome back
-              </Text>
               <Text className="text-dark-text text-base font-bold">
-                My Finances
+                Welcome Back, User
               </Text>
             </View>
           </View>
@@ -70,10 +62,13 @@ export default function HomeScreen() {
             {showBalance ? "$26,887.09" : "••••••••"}
           </Text>
 
-          <View className="flex-row items-center gap-1.5 mt-1">
+          <View className="flex-row items-center gap-1.5 mt-1 mb-4">
             <View className="bg-dark-bg/20 px-2.5 py-0.5 rounded-full flex-row items-center gap-1">
               <Ionicons name="trending-up" size={14} color="#0B0D12" />
-              <Text className="text-dark-bg text-xs font-bold">+$421.03 today</Text>
+              <Text className="text-dark-bg text-xs font-bold">
+                {showBalance ? "+$421.03" : "•••••••"}
+              </Text>
+              <Text className="text-dark-bg text-xs font-bold">today</Text>
             </View>
           </View>
         </View>
@@ -87,7 +82,9 @@ export default function HomeScreen() {
             <View className="w-11 h-11 rounded-full bg-dark-card border border-dark-border items-center justify-center mb-1.5">
               <Ionicons name="arrow-up" size={18} color="#F43F5E" />
             </View>
-            <Text className="text-dark-text text-xs font-semibold">Expense</Text>
+            <Text className="text-dark-text text-xs font-semibold">
+              Expense
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -97,7 +94,9 @@ export default function HomeScreen() {
             <View className="w-11 h-11 rounded-full bg-dark-card border border-dark-border items-center justify-center mb-1.5">
               <Ionicons name="swap-horizontal" size={18} color="#38BDF8" />
             </View>
-            <Text className="text-dark-text text-xs font-semibold">Transfer</Text>
+            <Text className="text-dark-text text-xs font-semibold">
+              Transfer
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -121,38 +120,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Liquid Assets Summary */}
-        <View className="mb-6">
-          <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-dark-text text-lg font-bold">Liquid Assets</Text>
-            <TouchableOpacity onPress={() => router.push("/accounts")}>
-              <Text className="text-brand-accent text-xs font-semibold">Manage</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View className="flex-row gap-3">
-            {/* Cash on Hand Card */}
-            <View className="flex-1 bg-dark-surface p-4 rounded-2xl border border-dark-border">
-              <View className="w-8 h-8 rounded-full bg-brand-income/10 items-center justify-center mb-2">
-                <Ionicons name="cash-outline" size={18} color="#22C55E" />
-              </View>
-              <Text className="text-dark-muted text-xs font-medium">Cash on Hand</Text>
-              <Text className="text-dark-text text-base font-bold mt-1">$1,250.00</Text>
-              <Text className="text-dark-muted text-[10px] mt-0.5">2 accounts</Text>
-            </View>
-
-            {/* Bank Card */}
-            <View className="flex-1 bg-dark-surface p-4 rounded-2xl border border-dark-border">
-              <View className="w-8 h-8 rounded-full bg-brand-transfer/10 items-center justify-center mb-2">
-                <Ionicons name="business-outline" size={18} color="#38BDF8" />
-              </View>
-              <Text className="text-dark-muted text-xs font-medium">Bank Accounts</Text>
-              <Text className="text-dark-text text-base font-bold mt-1">$25,637.09</Text>
-              <Text className="text-dark-muted text-[10px] mt-0.5">Primary & Savings</Text>
-            </View>
-          </View>
-        </View>
-
         {/* Latest Transactions Section */}
         <View className="mb-4">
           <View className="flex-row items-center justify-between mb-3">
@@ -174,8 +141,12 @@ export default function HomeScreen() {
                   <Ionicons name="arrow-down" size={18} color="#22C55E" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Eva Novak</Text>
-                  <Text className="text-dark-muted text-xs">Salary / Bank Transfer</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Eva Novak
+                  </Text>
+                  <Text className="text-dark-muted text-xs">
+                    Salary / Bank Transfer
+                  </Text>
                 </View>
               </View>
               <Text className="text-brand-income font-bold text-base">
@@ -189,7 +160,9 @@ export default function HomeScreen() {
                   <Ionicons name="cart-outline" size={18} color="#F43F5E" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Nike Store</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Nike Store
+                  </Text>
                   <Text className="text-dark-muted text-xs">Cash on hand</Text>
                 </View>
               </View>
@@ -204,8 +177,12 @@ export default function HomeScreen() {
                   <Ionicons name="repeat" size={18} color="#F59E0B" />
                 </View>
                 <View>
-                  <Text className="text-dark-text font-bold text-sm">Henrik Jansen</Text>
-                  <Text className="text-dark-muted text-xs">Lend (Debt Given)</Text>
+                  <Text className="text-dark-text font-bold text-sm">
+                    Henrik Jansen
+                  </Text>
+                  <Text className="text-dark-muted text-xs">
+                    Lend (Debt Given)
+                  </Text>
                 </View>
               </View>
               <Text className="text-brand-lend font-bold text-base">

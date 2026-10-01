@@ -33,7 +33,7 @@ export default function TabLayout() {
         tabBarButton: ({ ref, ...props }) => (
           <Pressable
             {...props}
-            android_ripple={{ color: "transparent" }}
+            android_ripple={null}
           />
         ),
       }}
