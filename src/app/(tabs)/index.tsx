@@ -3,9 +3,11 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../../context/auth";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { settings } = useAuth();
   const [showBalance, setShowBalance] = useState(false);
 
   return (
@@ -19,11 +21,13 @@ export default function HomeScreen() {
         <View className="flex-row items-center justify-between mb-5">
           <View className="flex-row items-center space-x-3 gap-3">
             <View className="w-10 h-10 rounded-full bg-brand-accent items-center justify-center">
-              <Text className="text-dark-bg font-bold text-base">H</Text>
+              <Text className="text-dark-bg font-bold text-base">
+                {settings?.userName ? settings.userName[0].toUpperCase() : "H"}
+              </Text>
             </View>
             <View>
               <Text className="text-dark-text text-base font-bold">
-                Welcome Back, User
+                {settings?.userName ? `Welcome Back, ${settings.userName}` : "Welcome Back"}
               </Text>
             </View>
           </View>

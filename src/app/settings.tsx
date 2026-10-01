@@ -1,16 +1,48 @@
-import React from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { eq } from "drizzle-orm";
+import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
-  View,
-  Text,
+  ActivityIndicator,
   ScrollView,
+  Text,
   TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useAuth } from "../context/auth";
+import { db } from "../db";
+import * as schema from "../db/schema";
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { settings, signInWithGoogle, disconnectGoogle, reloadSettings } =
+    useAuth();
+  const [connecting, setConnecting] = useState(false);
+
+  async function handleConnectGoogle() {
+    try {
+      setConnecting(true);
+      const googleInfo = await signInWithGoogle();
+      if (googleInfo && settings) {
+        db.update(schema.appSettings)
+          .set({
+            googleEmail: googleInfo.email,
+            googleName: googleInfo.name,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(schema.appSettings.id, settings.id))
+          .run();
+        reloadSettings();
+      }
+    } catch (err) {
+      console.log("Connect Google error:", err);
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  const isGoogleConnected = Boolean(settings?.googleEmail);
 
   return (
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-dark-bg">
@@ -27,18 +59,77 @@ export default function SettingsScreen() {
         <View className="w-10" />
       </View>
 
-      <ScrollView className="flex-1 px-5 pt-4" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1 px-5 pt-4"
+        showsVerticalScrollIndicator={false}
+      >
         {/* Account Profile Card */}
-        <View className="bg-dark-surface p-4 rounded-2xl border border-dark-border mb-6 flex-row items-center gap-3">
-          <View className="w-12 h-12 rounded-full bg-brand-accent items-center justify-center">
-            <Ionicons name="person" size={22} color="#0B0D12" />
+        <View className="bg-dark-surface p-4 rounded-2xl border border-dark-border mb-6 flex-row items-center justify-between">
+          <View className="flex-row items-center gap-3 flex-1">
+            <View className="w-12 h-12 rounded-full bg-brand-accent items-center justify-center">
+              <Text className="text-dark-bg font-extrabold text-lg">
+                {settings?.userName ? settings.userName[0].toUpperCase() : "H"}
+              </Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-dark-text font-bold text-base">
+                {settings?.userName || "User"}
+              </Text>
+              <Text className="text-dark-muted text-xs">
+                Currency: {settings?.currency || "Not set"} • Format:{" "}
+                {settings?.numberFormat || "COMMA_DOT"}
+              </Text>
+            </View>
           </View>
-          <View className="flex-1">
-            <Text className="text-dark-text font-bold text-base">Google Account</Text>
-            <Text className="text-dark-muted text-xs">Offline Session Active</Text>
-          </View>
-          <View className="bg-brand-income/10 px-2.5 py-1 rounded-full border border-brand-income/20">
-            <Text className="text-brand-income text-[11px] font-bold">Ready</Text>
+        </View>
+
+        {/* Google Cloud Account Status */}
+        <View className="bg-dark-surface p-4 rounded-2xl border border-dark-border mb-6">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-3">
+              <View className="w-10 h-10 rounded-full bg-dark-card border border-dark-border items-center justify-center">
+                <Ionicons name="logo-google" size={18} color="#F8FAFC" />
+              </View>
+              <View>
+                <Text className="text-dark-text font-bold text-sm">
+                  {isGoogleConnected
+                    ? settings?.googleName || "Google Account"
+                    : "Google Cloud Sync"}
+                </Text>
+                <Text className="text-dark-muted text-xs">
+                  {isGoogleConnected
+                    ? settings?.googleEmail
+                    : "Not connected (Offline mode)"}
+                </Text>
+              </View>
+            </View>
+
+            {isGoogleConnected ? (
+              <TouchableOpacity
+                onPress={disconnectGoogle}
+                className="bg-dark-card border border-dark-border px-3 py-1.5 rounded-full"
+                activeOpacity={0.7}
+              >
+                <Text className="text-brand-expense text-xs font-semibold">
+                  Disconnect
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={handleConnectGoogle}
+                disabled={connecting}
+                className="bg-brand-accent px-3 py-1.5 rounded-full"
+                activeOpacity={0.8}
+              >
+                {connecting ? (
+                  <ActivityIndicator size="small" color="#0B0D12" />
+                ) : (
+                  <Text className="text-dark-bg text-xs font-bold">
+                    Connect
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -54,7 +145,8 @@ export default function SettingsScreen() {
                 Cloud Database Sync
               </Text>
               <Text className="text-dark-muted text-xs mt-1">
-                Your data is stored locally in SQLite. Back up your encrypted database directly to your personal Google Drive appData.
+                Your data is stored locally in SQLite. Back up your encrypted
+                database directly to your personal Google Drive appData.
               </Text>
             </View>
 
@@ -65,7 +157,11 @@ export default function SettingsScreen() {
             >
               <View className="flex-row items-center gap-3">
                 <View className="w-9 h-9 rounded-full bg-brand-accent/10 items-center justify-center">
-                  <Ionicons name="cloud-upload-outline" size={18} color="#D4F938" />
+                  <Ionicons
+                    name="cloud-upload-outline"
+                    size={18}
+                    color="#D4F938"
+                  />
                 </View>
                 <View>
                   <Text className="text-dark-text font-semibold text-sm">
@@ -86,7 +182,11 @@ export default function SettingsScreen() {
             >
               <View className="flex-row items-center gap-3">
                 <View className="w-9 h-9 rounded-full bg-brand-transfer/10 items-center justify-center">
-                  <Ionicons name="cloud-download-outline" size={18} color="#38BDF8" />
+                  <Ionicons
+                    name="cloud-download-outline"
+                    size={18}
+                    color="#38BDF8"
+                  />
                 </View>
                 <View>
                   <Text className="text-dark-text font-semibold text-sm">
@@ -145,7 +245,9 @@ export default function SettingsScreen() {
 
         {/* App Info */}
         <View className="items-center py-6">
-          <Text className="text-dark-muted text-xs">Hawk Personal Finance v1.0.0</Text>
+          <Text className="text-dark-muted text-xs">
+            Hawk Personal Finance v1.0.0
+          </Text>
           <Text className="text-dark-muted/60 text-[11px] mt-0.5">
             Offline-First • Local SQLite
           </Text>

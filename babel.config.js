@@ -6,7 +6,7 @@ module.exports = function (api) {
       "nativewind/babel",
     ],
     plugins: [
-      ["inline-import", { paths: ["./drizzle"] }], // 👈 Added for Drizzle migrations
+      ["inline-import", { extensions: [".sql"] }],
     ],
   };
 };

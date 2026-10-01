@@ -1,5 +1,5 @@
-import { sql, relations } from "drizzle-orm";
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { relations, sql } from "drizzle-orm";
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // ==========================================
 // Constants & Types
@@ -25,6 +25,41 @@ export type CategoryType = (typeof CATEGORY_TYPES)[number];
 export const DEBT_TYPES = ["LEND", "BORROW"] as const;
 export type DebtType = (typeof DEBT_TYPES)[number];
 
+export const SUPPORTED_CURRENCIES = [
+  { code: "USD", symbol: "$", name: "US Dollar" },
+  { code: "EUR", symbol: "€", name: "Euro" },
+  { code: "GBP", symbol: "£", name: "British Pound" },
+  { code: "INR", symbol: "₹", name: "Indian Rupee" },
+  { code: "AED", symbol: "د.إ", name: "UAE Dirham" },
+  { code: "SAR", symbol: "﷼", name: "Saudi Riyal" },
+  { code: "JPY", symbol: "¥", name: "Japanese Yen" },
+  { code: "CAD", symbol: "$", name: "Canadian Dollar" },
+  { code: "AUD", symbol: "$", name: "Australian Dollar" },
+  { code: "SGD", symbol: "$", name: "Singapore Dollar" },
+  { code: "CHF", symbol: "Fr", name: "Swiss Franc" },
+  { code: "CNY", symbol: "¥", name: "Chinese Yuan" },
+  { code: "BRL", symbol: "R$", name: "Brazilian Real" },
+  { code: "TRY", symbol: "₺", name: "Turkish Lira" },
+  { code: "LKR", symbol: "Rs", name: "Srilanka Rupee" },
+] as const;
+
+export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number]["code"];
+
+export const NUMBER_FORMATS = [
+  {
+    id: "COMMA_DOT",
+    label: "1,234.56",
+    example: "1,234.56 (Comma thousands, point decimal)",
+  },
+  {
+    id: "DOT_COMMA",
+    label: "1.234,56",
+    example: "1.234,56 (Point thousands, comma decimal)",
+  },
+] as const;
+
+export type NumberFormatId = (typeof NUMBER_FORMATS)[number]["id"];
+
 // ==========================================
 // 1. Liquid Assets Table (Cash & Bank)
 // ==========================================
@@ -35,7 +70,9 @@ export const liquidAssets = sqliteTable("liquid_assets", {
   accountNumber: text("account_number"), // Optional, for Bank accounts
   initialBalance: real("initial_balance").default(0).notNull(), // Starting balance without extra transaction
   note: text("note"),
-  isArchived: integer("is_archived", { mode: "boolean" }).default(false).notNull(), // Archive instead of deleting
+  isArchived: integer("is_archived", { mode: "boolean" })
+    .default(false)
+    .notNull(), // Archive instead of deleting
   createdAt: text("created_at")
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),
@@ -55,7 +92,9 @@ export const contacts = sqliteTable("contacts", {
   name: text("name").notNull(),
   mobileNumber: text("mobile_number"),
   note: text("note"),
-  isArchived: integer("is_archived", { mode: "boolean" }).default(false).notNull(), // Archive instead of deleting
+  isArchived: integer("is_archived", { mode: "boolean" })
+    .default(false)
+    .notNull(), // Archive instead of deleting
   createdAt: text("created_at")
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),
@@ -89,8 +128,12 @@ export const debts = sqliteTable("debts", {
   type: text("type", { enum: DEBT_TYPES }).notNull(), // 'LEND' | 'BORROW'
   amount: real("amount").notNull(), // Total initial amount of the debt
   dueDate: text("due_date"), // Optional deadline for repayment
-  isSettled: integer("is_settled", { mode: "boolean" }).default(false).notNull(), // Automatically true when fully paid
-  isSettledManually: integer("is_settled_manually", { mode: "boolean" }).default(false).notNull(), // Manual settlement / forgiveness
+  isSettled: integer("is_settled", { mode: "boolean" })
+    .default(false)
+    .notNull(), // Automatically true when fully paid
+  isSettledManually: integer("is_settled_manually", { mode: "boolean" })
+    .default(false)
+    .notNull(), // Manual settlement / forgiveness
   note: text("note"),
   createdAt: text("created_at")
     .default(sql`(CURRENT_TIMESTAMP)`)
@@ -157,6 +200,32 @@ export const budgets = sqliteTable("budgets", {
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),
 });
+
+// ==========================================
+// 7. App Settings & User Profile Table
+// ==========================================
+export const appSettings = sqliteTable("app_settings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userName: text("user_name").notNull(), // Required user name
+  currency: text("currency"), // Default null, chosen in onboarding
+  numberFormat: text("number_format").default("COMMA_DOT").notNull(), // 'COMMA_DOT' (1,234.56) or 'DOT_COMMA' (1.234,56)
+  hasOnboarded: integer("has_onboarded", { mode: "boolean" })
+    .default(false)
+    .notNull(),
+  lastBackup: text("last_backup"), // Timestamp of last Google Drive backup
+  profilePic: text("profile_pic"), // Local path/URI only, excluded from cloud sync
+  googleEmail: text("google_email"),
+  googleName: text("google_name"),
+  createdAt: text("created_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
+  updatedAt: text("updated_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
+});
+
+export type AppSettings = typeof appSettings.$inferSelect;
+export type NewAppSettings = typeof appSettings.$inferInsert;
 
 // ==========================================
 // Drizzle Relations
