@@ -1,35 +1,90 @@
+import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  Image,
-  ActivityIndicator,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { CurrencyPicker } from "../../components/CurrencyPicker";
 import { useAuth } from "../../context/auth";
 import {
-  SUPPORTED_CURRENCIES,
   NUMBER_FORMATS,
   NumberFormatId,
+  SUPPORTED_CURRENCIES,
 } from "../../db/schema";
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const { pendingGoogleUser, completeOnboarding } = useAuth();
 
-  // Pre-fill with Google name/photo if available
+  // Name & Profile Picture
   const [name, setName] = useState(pendingGoogleUser?.name || "");
+  const [profilePic, setProfilePic] = useState<string | null>(null);
+
+  // Currency Selection with Fly-up modal
   const [selectedCurrency, setSelectedCurrency] = useState<string>(""); // default none
-  const [selectedFormat, setSelectedFormat] = useState<NumberFormatId>("COMMA_DOT");
+  const [currencyPickerVisible, setCurrencyPickerVisible] = useState(false);
+
+  // Number Format (Horizontal View - COMMA_DOT default)
+  const [selectedFormat, setSelectedFormat] =
+    useState<NumberFormatId>("COMMA_DOT");
+
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const selectedCurrencyObj = SUPPORTED_CURRENCIES.find(
+    (c) => c.code === selectedCurrency,
+  );
+
   const canSubmit = name.trim().length > 0 && selectedCurrency.length > 0;
+
+  // Image Picker: Save low-quality local image to app storage
+  async function handlePickImage() {
+    try {
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission Required",
+          "Please grant media gallery permissions to set your profile picture.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.2, // Low quality as it's a small local avatar
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const pickedUri = result.assets[0].uri;
+        const fileName = `profile_${Date.now()}.jpg`;
+        const destUri = `${FileSystem.documentDirectory}${fileName}`;
+
+        await FileSystem.copyAsync({
+          from: pickedUri,
+          to: destUri,
+        });
+
+        setProfilePic(destUri);
+      }
+    } catch (err) {
+      console.warn("Failed to pick image:", err);
+      Alert.alert("Error", "Could not select image. Please try again.");
+    }
+  }
 
   async function handleFinish() {
     if (!name.trim()) {
@@ -49,7 +104,7 @@ export default function OnboardingScreen() {
         userName: name.trim(),
         currency: selectedCurrency,
         numberFormat: selectedFormat,
-        profilePic: pendingGoogleUser?.photo || null,
+        profilePic: profilePic || null,
       });
 
       // Redirect into main app tabs
@@ -69,27 +124,38 @@ export default function OnboardingScreen() {
         contentContainerStyle={{ paddingBottom: 40 }}
         className="flex-1 px-6 pt-6"
       >
-        {/* Title & Header */}
+        {/* Title & Header with Profile Picture Picker */}
         <View className="mb-6 items-center">
-          <View className="w-16 h-16 rounded-3xl bg-brand-accent/15 border border-brand-accent/30 items-center justify-center mb-3">
-            {pendingGoogleUser?.photo ? (
-              <Image
-                source={{ uri: pendingGoogleUser.photo }}
-                className="w-14 h-14 rounded-2xl"
-              />
-            ) : (
-              <Text className="text-brand-accent font-extrabold text-2xl">
-                {name.trim() ? name.trim()[0].toUpperCase() : "H"}
-              </Text>
-            )}
-          </View>
+          <TouchableOpacity
+            onPress={handlePickImage}
+            activeOpacity={0.8}
+            className="relative mb-3"
+          >
+            <View className="w-22 h-22 rounded-full bg-brand-accent/15 border-2 border-brand-accent/40 items-center justify-center overflow-hidden shadow-xl">
+              {profilePic ? (
+                <Image
+                  source={{ uri: profilePic }}
+                  className="w-full h-full rounded-full"
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text className="text-brand-accent font-extrabold text-3xl">
+                  {name.trim() ? name.trim()[0].toUpperCase() : "H"}
+                </Text>
+              )}
+            </View>
+
+            {/* Camera badge icon */}
+            <View className="absolute bottom-0 right-0 bg-brand-accent w-7 h-7 rounded-full items-center justify-center border-2 border-dark-bg shadow-md">
+              <Ionicons name="camera" size={13} color="#0B0D12" />
+            </View>
+          </TouchableOpacity>
+
           <Text className="text-dark-text text-2xl font-extrabold tracking-tight">
             Personalize Hawk
           </Text>
           <Text className="text-dark-muted text-xs text-center mt-1">
-            {pendingGoogleUser
-              ? `Connected as ${pendingGoogleUser.email}`
-              : "Set up your offline profile. You can connect Google later."}
+            Tap the avatar to add your photo. Stored locally on this device.
           </Text>
         </View>
 
@@ -119,91 +185,90 @@ export default function OnboardingScreen() {
           </View>
         </View>
 
-        {/* 2. Currency Selector */}
+        {/* 2. Base Currency (Fly-up Menu Trigger) */}
         <View className="mb-6">
-          <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-dark-text text-sm font-bold">
-              Base Currency <Text className="text-brand-accent">*</Text>
-            </Text>
-            <Text className="text-dark-muted text-xs">
-              {selectedCurrency ? `Selected: ${selectedCurrency}` : "Choose one"}
-            </Text>
-          </View>
+          <Text className="text-dark-text text-sm font-bold mb-2">
+            Base Currency <Text className="text-brand-accent">*</Text>
+          </Text>
 
-          {/* Grid of Currencies */}
-          <View className="flex-row flex-wrap gap-2">
-            {SUPPORTED_CURRENCIES.map((cur) => {
-              const isSelected = selectedCurrency === cur.code;
-              return (
-                <TouchableOpacity
-                  key={cur.code}
-                  onPress={() => setSelectedCurrency(cur.code)}
-                  className={`px-3 py-2.5 rounded-2xl border flex-row items-center gap-1.5 ${
-                    isSelected
-                      ? "bg-brand-accent border-brand-accent"
-                      : "bg-dark-surface border-dark-border"
-                  }`}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    className={`font-extrabold text-sm ${
-                      isSelected ? "text-dark-bg" : "text-brand-accent"
-                    }`}
-                  >
-                    {cur.symbol}
-                  </Text>
-                  <Text
-                    className={`font-semibold text-xs ${
-                      isSelected ? "text-dark-bg" : "text-dark-text"
-                    }`}
-                  >
-                    {cur.code}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <TouchableOpacity
+            onPress={() => setCurrencyPickerVisible(true)}
+            className="bg-dark-surface border border-dark-border rounded-2xl px-4 py-3.5 flex-row items-center justify-between"
+            activeOpacity={0.8}
+          >
+            <View className="flex-row items-center gap-3">
+              <View className="w-8 h-8 rounded-xl bg-brand-accent/15 items-center justify-center">
+                <Text className="text-brand-accent font-extrabold text-sm">
+                  {selectedCurrencyObj?.symbol || "$"}
+                </Text>
+              </View>
+              <Text
+                className={`text-base ${
+                  selectedCurrencyObj
+                    ? "text-dark-text font-medium"
+                    : "text-dark-muted"
+                }`}
+              >
+                {selectedCurrencyObj
+                  ? selectedCurrencyObj.name
+                  : "Select currency"}
+              </Text>
+            </View>
+
+            <View className="flex-row items-center gap-2">
+              {selectedCurrencyObj && (
+                <Text className="text-brand-accent font-bold text-base">
+                  {selectedCurrencyObj.symbol}
+                </Text>
+              )}
+              <Ionicons name="chevron-down" size={18} color="#60677C" />
+            </View>
+          </TouchableOpacity>
         </View>
 
-        {/* 3. Number Separation Format */}
+        {/* 3. Number Format (2 Options in Horizontal View, Comma-Dot Default) */}
         <View className="mb-8">
           <Text className="text-dark-text text-sm font-bold mb-2">
             Number Format
           </Text>
-          <View className="space-y-2 gap-2">
+
+          {/* 2 options in horizontal view */}
+          <View className="flex-row gap-3">
             {NUMBER_FORMATS.map((fmt) => {
               const isSelected = selectedFormat === fmt.id;
               return (
                 <TouchableOpacity
                   key={fmt.id}
                   onPress={() => setSelectedFormat(fmt.id)}
-                  className={`p-3.5 rounded-2xl border flex-row items-center justify-between ${
+                  className={`flex-1 py-3.5 px-4 rounded-2xl border items-center justify-center ${
                     isSelected
-                      ? "bg-dark-surface border-brand-accent"
+                      ? "bg-brand-accent/15 border-brand-accent"
                       : "bg-dark-surface border-dark-border"
                   }`}
                   activeOpacity={0.7}
                 >
-                  <View>
-                    <Text className="text-dark-text font-bold text-sm">
-                      {fmt.label}
-                    </Text>
-                    <Text className="text-dark-muted text-[11px] mt-0.5">
-                      {fmt.example}
-                    </Text>
-                  </View>
-                  <Ionicons
-                    name={
-                      isSelected
-                        ? "radio-button-on"
-                        : "radio-button-off"
-                    }
-                    size={20}
-                    color={isSelected ? "#D4F938" : "#60677C"}
-                  />
+                  <Text
+                    className={`font-bold text-base ${
+                      isSelected ? "text-brand-accent" : "text-dark-text"
+                    }`}
+                  >
+                    {fmt.label}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
+          </View>
+
+          {/* Example text below */}
+          <View className="mt-2.5 px-1">
+            <Text className="text-dark-muted text-xs">
+              Example:{" "}
+              <Text className="text-dark-text font-semibold">
+                {selectedFormat === "COMMA_DOT"
+                  ? `${selectedCurrencyObj?.symbol || "$"} 1,234,567.89`
+                  : `${selectedCurrencyObj?.symbol || "$"} 1.234.567,89`}
+              </Text>
+            </Text>
           </View>
         </View>
 
@@ -231,6 +296,14 @@ export default function OnboardingScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Fly-up Currency Picker Modal */}
+      <CurrencyPicker
+        visible={currencyPickerVisible}
+        selectedCode={selectedCurrency}
+        onSelect={(code) => setSelectedCurrency(code)}
+        onClose={() => setCurrencyPickerVisible(false)}
+      />
     </SafeAreaView>
   );
 }

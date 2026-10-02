@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -28,7 +28,8 @@ export default function LoginScreen() {
         return;
       }
       setErrorMsg(
-        err?.message || "Google Sign-In failed. You can also tap 'Set up Later'.",
+        err?.message ||
+          "Google Sign-In failed. You can also tap 'Set up Later'.",
       );
     } finally {
       setSigningIn(false);
@@ -44,7 +45,7 @@ export default function LoginScreen() {
       {/* Top / Center Branding Section */}
       <View className="flex-1 justify-center items-center">
         {/* Hawk Logo */}
-        <View className="w-28 h-28 rounded-3xl bg-brand-accent/10 border border-brand-accent/30 items-center justify-center mb-6 shadow-2xl">
+        <View className="w-28 h-28 items-center justify-center mb-6 shadow-2xl">
           <Image
             source={require("../../../assets/logo/logo-removebg-preview.png")}
             style={{ width: 80, height: 80 }}
@@ -120,7 +121,7 @@ export default function LoginScreen() {
 
         <Text className="text-dark-muted text-[11px] text-center px-4 leading-4 mt-2">
           100% offline-first. All financial records are stored locally in your
-          device SQLite database. Cloud sync can be connected in future releases.
+          device. Connect with your google account to store your data in cloud.
         </Text>
       </View>
     </SafeAreaView>
