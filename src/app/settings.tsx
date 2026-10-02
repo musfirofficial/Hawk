@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -21,25 +22,11 @@ export default function SettingsScreen() {
   const [connecting, setConnecting] = useState(false);
 
   async function handleConnectGoogle() {
-    try {
-      setConnecting(true);
-      const googleInfo = await signInWithGoogle();
-      if (googleInfo && settings) {
-        db.update(schema.appSettings)
-          .set({
-            googleEmail: googleInfo.email,
-            googleName: googleInfo.name,
-            updatedAt: new Date().toISOString(),
-          })
-          .where(eq(schema.appSettings.id, settings.id))
-          .run();
-        reloadSettings();
-      }
-    } catch (err) {
-      console.log("Connect Google error:", err);
-    } finally {
-      setConnecting(false);
-    }
+    Alert.alert(
+      "Cloud Sync (Phase 4)",
+      "Google Drive backup will be enabled after the full offline app is completed. All data is currently stored locally in SQLite.",
+      [{ text: "Got it" }]
+    );
   }
 
   const isGoogleConnected = Boolean(settings?.googleEmail);

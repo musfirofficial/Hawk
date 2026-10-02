@@ -1,10 +1,12 @@
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { eq } from "drizzle-orm";
 import * as SecureStore from "expo-secure-store";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { db, ensureDatabaseInitialized } from "../db";
 import * as schema from "../db/schema";
 import { AppSettings, NumberFormatId } from "../db/schema";
+
+// Note: Native Google Sign-In is deferred until the final development/cloud build.
+// This allows 100% offline development and smooth testing in Expo Go.
 
 interface GoogleUserInfo {
   email: string;
@@ -39,22 +41,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [pendingGoogleUser, setPendingGoogleUser] =
     useState<GoogleUserInfo | null>(null);
 
-  // Initialize DB and Google Sign-in on mount
+  // Initialize DB and load local app settings on mount
+  // Initialize DB and load local app settings on mount
   useEffect(() => {
     async function init() {
       try {
         ensureDatabaseInitialized();
         loadSettingsFromDB();
-
-        // Configure Google Sign-in safely
-        const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-        if (webClientId) {
-          GoogleSignin.configure({
-            webClientId,
-            scopes: ["https://www.googleapis.com/auth/drive.appdata"],
-            offlineAccess: true,
-          });
-        }
       } catch (err) {
         console.warn("Auth initialization warning:", err);
       } finally {
@@ -82,38 +75,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Google Sign-in
+  // Google Sign-in: Deferred until Phase 4 (Cloud Sync build)
   async function signInWithGoogle(): Promise<GoogleUserInfo | null> {
-    try {
-      await GoogleSignin.hasPlayServices();
-      const response = await GoogleSignin.signIn();
-
-      // Support both new v13+ response shape (response.data) and legacy (response.user)
-      const userObj = (response as any).data?.user || (response as any).user;
-      const tokens = (response as any).data || response;
-
-      if (!userObj) {
-        throw new Error("No user data returned from Google");
-      }
-
-      const googleInfo: GoogleUserInfo = {
-        id: userObj.id,
-        email: userObj.email,
-        name: userObj.name || userObj.givenName || null,
-        photo: userObj.photo || null,
-      };
-
-      // Securely store token for Phase 4 Drive backups
-      if (tokens.idToken) {
-        await SecureStore.setItemAsync("google_id_token", tokens.idToken);
-      }
-
-      setPendingGoogleUser(googleInfo);
-      return googleInfo;
-    } catch (error) {
-      console.error("Google Sign-in error:", error);
-      throw error;
-    }
+    throw new Error(
+      "Google Sign-In is deferred until Cloud Sync Phase. Please tap 'Set up Later' to continue offline.",
+    );
   }
 
   // Complete Onboarding: Save profile and mark hasOnboarded = true
@@ -169,7 +135,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Disconnect Google Account
   async function disconnectGoogle() {
     try {
-      await GoogleSignin.signOut();
       await SecureStore.deleteItemAsync("google_id_token");
 
       if (settings) {
