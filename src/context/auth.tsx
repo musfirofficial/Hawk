@@ -1,24 +1,23 @@
 import { eq } from "drizzle-orm";
-import * as SecureStore from "expo-secure-store";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { ENABLE_GOOGLE_AUTH } from "../config/appConfig";
 import { db, ensureDatabaseInitialized } from "../db";
 import * as schema from "../db/schema";
 import { AppSettings, NumberFormatId } from "../db/schema";
+import {
+  configureGoogleSignIn,
+  GoogleUserInfo,
+  performGoogleSignIn,
+  performGoogleSignOut,
+} from "../services/googleAuth";
 
-// Note: Native Google Sign-In is deferred until the final development/cloud build.
-// This allows 100% offline development and smooth testing in Expo Go.
-
-interface GoogleUserInfo {
-  email: string;
-  name: string | null;
-  photo: string | null;
-  id: string;
-}
+export { GoogleUserInfo };
 
 interface AuthContextType {
   settings: AppSettings | null;
   isLoading: boolean;
   hasOnboarded: boolean;
+  isGoogleAuthEnabled: boolean;
   pendingGoogleUser: GoogleUserInfo | null;
   setPendingGoogleUser: (user: GoogleUserInfo | null) => void;
   signInWithGoogle: () => Promise<GoogleUserInfo | null>;
@@ -42,12 +41,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useState<GoogleUserInfo | null>(null);
 
   // Initialize DB and load local app settings on mount
-  // Initialize DB and load local app settings on mount
   useEffect(() => {
     async function init() {
       try {
         ensureDatabaseInitialized();
         loadSettingsFromDB();
+
+        // Only initialize Google Sign-in if feature flag is active
+        if (ENABLE_GOOGLE_AUTH) {
+          configureGoogleSignIn();
+        }
       } catch (err) {
         console.warn("Auth initialization warning:", err);
       } finally {
@@ -75,11 +78,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Google Sign-in: Deferred until Phase 4 (Cloud Sync build)
+  // Google Sign-in (Enabled or Disabled via ENABLE_GOOGLE_AUTH flag)
   async function signInWithGoogle(): Promise<GoogleUserInfo | null> {
-    throw new Error(
-      "Google Sign-In is deferred until Cloud Sync Phase. Please tap 'Set up Later' to continue offline.",
-    );
+    if (!ENABLE_GOOGLE_AUTH) {
+      throw new Error(
+        "Google Sign-In is currently disabled. Toggle ENABLE_GOOGLE_AUTH in src/config/appConfig.ts to enable.",
+      );
+    }
+
+    try {
+      const googleInfo = await performGoogleSignIn();
+      setPendingGoogleUser(googleInfo);
+      return googleInfo;
+    } catch (error) {
+      console.error("Google Sign-in error:", error);
+      throw error;
+    }
   }
 
   // Complete Onboarding: Save profile and mark hasOnboarded = true
@@ -135,7 +149,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Disconnect Google Account
   async function disconnectGoogle() {
     try {
-      await SecureStore.deleteItemAsync("google_id_token");
+      if (ENABLE_GOOGLE_AUTH) {
+        await performGoogleSignOut();
+      }
 
       if (settings) {
         db.update(schema.appSettings)
@@ -160,6 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         settings,
         isLoading,
         hasOnboarded,
+        isGoogleAuthEnabled: ENABLE_GOOGLE_AUTH,
         pendingGoogleUser,
         setPendingGoogleUser,
         signInWithGoogle,

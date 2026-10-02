@@ -17,16 +17,46 @@ import * as schema from "../db/schema";
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { settings, signInWithGoogle, disconnectGoogle, reloadSettings } =
-    useAuth();
+  const {
+    settings,
+    signInWithGoogle,
+    disconnectGoogle,
+    reloadSettings,
+    isGoogleAuthEnabled,
+  } = useAuth();
   const [connecting, setConnecting] = useState(false);
 
   async function handleConnectGoogle() {
-    Alert.alert(
-      "Cloud Sync (Phase 4)",
-      "Google Drive backup will be enabled after the full offline app is completed. All data is currently stored locally in SQLite.",
-      [{ text: "Got it" }]
-    );
+    if (!isGoogleAuthEnabled) {
+      Alert.alert(
+        "Cloud Sync Disabled",
+        "Google Drive sync is currently toggled off (ENABLE_GOOGLE_AUTH in src/config/appConfig.ts). Flip it to true when testing with a development build.",
+        [{ text: "OK" }],
+      );
+      return;
+    }
+
+    try {
+      setConnecting(true);
+      const googleInfo = await signInWithGoogle();
+      if (googleInfo && settings) {
+        db.update(schema.appSettings)
+          .set({
+            googleEmail: googleInfo.email,
+            googleName: googleInfo.name,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(schema.appSettings.id, settings.id))
+          .run();
+        reloadSettings();
+      }
+    } catch (err: any) {
+      if (err?.code !== "12501") {
+        Alert.alert("Connection Failed", err?.message || "Could not sign in with Google.");
+      }
+    } finally {
+      setConnecting(false);
+    }
   }
 
   const isGoogleConnected = Boolean(settings?.googleEmail);
