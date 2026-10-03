@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -17,52 +16,68 @@ export default function LoginScreen() {
   const [signingIn, setSigningIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  async function handleGoogleLogin() {
-    try {
-      setSigningIn(true);
-      setErrorMsg(null);
-      await signInWithGoogle();
-      router.push("/(auth)/onboarding");
-    } catch (err: any) {
-      if (err?.code === "12501" || err?.message?.includes("Canceled")) {
-        return;
+  async function handleLogin() {
+    if (isGoogleAuthEnabled) {
+      try {
+        setSigningIn(true);
+        setErrorMsg(null);
+        await signInWithGoogle();
+        router.push("/(auth)/onboarding");
+      } catch (err: any) {
+        if (err?.code === "12501" || err?.message?.includes("Canceled")) {
+          return;
+        }
+        setErrorMsg(err?.message || "Google Sign-In failed.");
+      } finally {
+        setSigningIn(false);
       }
-      setErrorMsg(
-        err?.message ||
-          "Google Sign-In failed. You can also tap 'Set up Later'.",
-      );
-    } finally {
-      setSigningIn(false);
+    } else {
+      // In offline development mode, proceed directly to setup
+      router.push("/(auth)/onboarding");
     }
   }
 
-  function handleProceedOffline() {
+  function handleOpenAccount() {
+    router.push("/(auth)/onboarding");
+  }
+
+  function handleDemo() {
     router.push("/(auth)/onboarding");
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-dark-bg justify-between p-6">
-      {/* Top / Center Branding Section */}
-      <View className="flex-1 justify-center items-center">
-        {/* Hawk Logo */}
-        <View className="w-28 h-28 items-center justify-center mb-6 shadow-2xl">
+    <SafeAreaView className="flex-1 bg-dark-bg justify-between px-7 pt-4 pb-8">
+      {/* Top Header: Logo on Left, Demo > on Right */}
+      <View className="flex-row items-center justify-between w-full pt-2">
+        {/* Minimal Brand Icon */}
+        <View className="w-9 h-9 items-center justify-center">
           <Image
             source={require("../../../assets/logo/logo-removebg-preview.png")}
-            style={{ width: 80, height: 80 }}
+            style={{ width: 40, height: 40 }}
             resizeMode="contain"
           />
         </View>
+      </View>
 
-        <Text className="text-dark-text text-3xl font-extrabold tracking-tight mb-2 text-center">
-          Hawk Finance
+      {/* Main Editorial Hero Section */}
+      <View className="flex-1 justify-center pb-8">
+        {/* Headline */}
+        <Text className="text-dark-text text-[52px] leading-[58px] font-light tracking-[-1.5px] mb-6">
+          Banking{"\n"}Just Got{"\n"}
+          <Text className="font-normal text-white">Easier!</Text>
         </Text>
-        <Text className="text-dark-muted text-sm text-center px-6 leading-5">
-          Minimalist, offline-first personal wealth management. Your data stays
-          securely on your device.
-        </Text>
+
+        {/* Arrow + Classy Copy */}
+        <View className="flex-row items-start gap-3 pr-6">
+          <Text className="text-dark-text text-xl leading-6 font-light">→</Text>
+          <Text className="flex-1 text-dark-muted text-sm leading-5">
+            Manage your finances anywhere, anytime. Master liquid wealth, settle
+            debts, and monitor your accounts with ease.
+          </Text>
+        </View>
 
         {errorMsg && (
-          <View className="mt-4 p-3 bg-brand-expense/10 border border-brand-expense/20 rounded-xl max-w-xs">
+          <View className="mt-4 p-3 bg-brand-expense/10 border border-brand-expense/20 rounded-xl">
             <Text className="text-brand-expense text-xs text-center">
               {errorMsg}
             </Text>
@@ -70,59 +85,38 @@ export default function LoginScreen() {
         )}
       </View>
 
-      {/* Auth Actions Section */}
-      <View className="mb-6 space-y-3 gap-3">
-        {isGoogleAuthEnabled ? (
-          <>
-            {/* Primary: Continue with Google */}
-            <TouchableOpacity
-              onPress={handleGoogleLogin}
-              disabled={signingIn}
-              className="bg-dark-surface border border-dark-border py-4 px-6 rounded-2xl flex-row items-center justify-center gap-3 shadow-md"
-              activeOpacity={0.8}
-            >
-              {signingIn ? (
-                <ActivityIndicator color="#D4F938" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="logo-google" size={20} color="#F8FAFC" />
-                  <Text className="text-dark-text font-bold text-base">
-                    Continue with Google
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
+      {/* Bottom Actions Section */}
+      <View className="w-full">
+        {/* Thin Divider Line */}
+        <View className="h-[1px] bg-dark-border w-full mb-6" />
 
-            {/* Secondary: Set up Later */}
-            <TouchableOpacity
-              onPress={handleProceedOffline}
-              disabled={signingIn}
-              className="py-3 px-6 rounded-2xl items-center justify-center"
-              activeOpacity={0.7}
-            >
-              <Text className="text-brand-accent font-bold text-sm">
-                Set up Later
-              </Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          /* Offline Mode Primary Action: Get Started */
+        {/* Two Pill Buttons: Log In & Open an Account */}
+        <View className="flex-row items-center gap-3 w-full">
+          {/* LOG IN (Outlined Pill) */}
           <TouchableOpacity
-            onPress={handleProceedOffline}
-            className="bg-brand-accent py-4 px-6 rounded-2xl flex-row items-center justify-center gap-2 shadow-lg"
-            activeOpacity={0.8}
+            onPress={handleLogin}
+            disabled={signingIn}
+            className="flex-1 py-4 px-4 rounded-full border border-dark-border bg-dark-surface items-center justify-center active:opacity-80"
           >
-            <Text className="text-dark-bg font-extrabold text-base">
-              Get Started
-            </Text>
-            <Ionicons name="arrow-forward" size={18} color="#0B0D12" />
+            {signingIn ? (
+              <ActivityIndicator color="#F8FAFC" size="small" />
+            ) : (
+              <Text className="text-dark-text font-bold text-xs tracking-wider uppercase">
+                Log In
+              </Text>
+            )}
           </TouchableOpacity>
-        )}
 
-        <Text className="text-dark-muted text-[11px] text-center px-4 leading-4 mt-2">
-          100% offline-first. All financial records are stored locally in your
-          device. Connect with your google account to store your data in cloud.
-        </Text>
+          {/* OPEN AN ACCOUNT (Filled Pill) */}
+          <TouchableOpacity
+            onPress={handleOpenAccount}
+            className="flex-1 py-4 px-4 rounded-full bg-white items-center justify-center active:opacity-90 shadow-md"
+          >
+            <Text className="text-dark-bg font-extrabold text-xs tracking-wider uppercase">
+              Open an Account
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
