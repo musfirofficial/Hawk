@@ -9,7 +9,10 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.musfir.thahir.Hawk"
+      "bundleIdentifier": "com.musfir.thahir.Hawk",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "This app uses Face ID to securely log you into your account."
+      }
     },
     "android": {
       "adaptiveIcon": {

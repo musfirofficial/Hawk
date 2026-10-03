@@ -27,7 +27,9 @@ export default function HomeScreen() {
             </View>
             <View>
               <Text className="text-dark-text text-base font-bold">
-                {settings?.userName ? `Welcome Back, ${settings.userName}` : "Welcome Back"}
+                {settings?.userName
+                  ? `Welcome Back, ${settings.userName}`
+                  : "Welcome Back"}
               </Text>
             </View>
           </View>
@@ -66,7 +68,7 @@ export default function HomeScreen() {
             {showBalance ? "$26,887.09" : "••••••••"}
           </Text>
 
-          <View className="flex-row items-center gap-1.5 mt-1 mb-4">
+          <View className="flex-row items-center gap-1.5 mt-1 mb-1">
             <View className="bg-dark-bg/20 px-2.5 py-0.5 rounded-full flex-row items-center gap-1">
               <Ionicons name="trending-up" size={14} color="#0B0D12" />
               <Text className="text-dark-bg text-xs font-bold">
