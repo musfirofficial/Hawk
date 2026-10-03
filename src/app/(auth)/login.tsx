@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -67,7 +67,12 @@ export default function LoginScreen() {
 
         {/* Arrow + Classy Copy */}
         <View className="flex-row items-start gap-3 pr-6">
-          <Text className="text-brand-accent text-xl leading-6 font-light">→</Text>
+          <Ionicons
+            name="arrow-forward-outline"
+            size={20}
+            color="#D4F938"
+            className="text-brand-accent mt-0.5"
+          />
           <Text className="flex-1 text-dark-muted text-sm leading-5">
             Manage your finances anywhere, anytime. Master liquid wealth, settle
             debts, and monitor your accounts with ease.
