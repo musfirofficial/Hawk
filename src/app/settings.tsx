@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { eq } from "drizzle-orm";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -77,18 +77,14 @@ export default function SettingsScreen() {
 
   async function executeGoogleAccountAction() {
     if (settings?.googleEmail) {
-      Alert.alert(
-        "Google Account",
-        `Connected as ${settings.googleEmail}`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Disconnect",
-            style: "destructive",
-            onPress: () => disconnectGoogle(),
-          },
-        ]
-      );
+      Alert.alert("Google Account", `Connected as ${settings.googleEmail}`, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Disconnect",
+          style: "destructive",
+          onPress: () => disconnectGoogle(),
+        },
+      ]);
       return;
     }
 
@@ -96,7 +92,7 @@ export default function SettingsScreen() {
       Alert.alert(
         "Cloud Sync",
         "Google Sign-In is disabled in config (ENABLE_GOOGLE_AUTH).",
-        [{ text: "OK" }]
+        [{ text: "OK" }],
       );
       return;
     }
@@ -127,7 +123,7 @@ export default function SettingsScreen() {
   async function handleToggleBiometrics(val: boolean) {
     if (val && bioCapability.isAvailable) {
       const res = await authenticateWithBiometrics(
-        `Confirm ${bioCapability.label} to enable`
+        `Confirm ${bioCapability.label} to enable`,
       );
       if (res.success) {
         await updateSecuritySettings({ biometricsEnabled: true });
@@ -189,7 +185,7 @@ export default function SettingsScreen() {
                 Alert.alert("Reset Complete", "All data has been cleared.");
               },
             },
-          ]
+          ],
         );
       },
     });
@@ -233,7 +229,9 @@ export default function SettingsScreen() {
                 />
               ) : (
                 <Text className="text-brand-accent font-bold text-lg">
-                  {settings?.userName ? settings.userName[0].toUpperCase() : "H"}
+                  {settings?.userName
+                    ? settings.userName[0].toUpperCase()
+                    : "H"}
                 </Text>
               )}
             </View>
@@ -243,7 +241,8 @@ export default function SettingsScreen() {
                 {settings?.userName || "Hawk User"}
               </Text>
               <Text className="text-dark-muted text-xs mt-0.5">
-                {settings?.googleEmail || `${settings?.currency || "USD"} Vault`}
+                {settings?.googleEmail ||
+                  `${settings?.currency || "USD"} Vault`}
               </Text>
             </View>
           </View>
@@ -329,7 +328,11 @@ export default function SettingsScreen() {
             activeOpacity={0.7}
           >
             <View className="flex-row items-center gap-3.5">
-              <Ionicons name="shield-checkmark-outline" size={20} color="#94A3B8" />
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={20}
+                color="#94A3B8"
+              />
               <Text className="text-dark-text font-semibold text-sm">
                 Security Checks
               </Text>
@@ -360,7 +363,11 @@ export default function SettingsScreen() {
             activeOpacity={0.7}
           >
             <View className="flex-row items-center gap-3.5">
-              <Ionicons name="cloud-download-outline" size={20} color="#94A3B8" />
+              <Ionicons
+                name="cloud-download-outline"
+                size={20}
+                color="#94A3B8"
+              />
               <Text className="text-dark-text font-semibold text-sm">
                 Restore Database
               </Text>
