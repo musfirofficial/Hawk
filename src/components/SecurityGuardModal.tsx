@@ -156,7 +156,7 @@ export function SecurityGuardModal({
               return (
                 <View
                   key={index}
-                  className={`w-14 h-14 rounded-2xl items-center justify-center border-2 transition-all ${
+                  className={`w-14 h-14 rounded-2xl items-center justify-center border-2 ${
                     isFilled
                       ? "border-brand-accent bg-brand-accent/15"
                       : "border-dark-border bg-dark-card"
