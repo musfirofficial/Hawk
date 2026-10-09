@@ -91,6 +91,13 @@ export function ensureDatabaseInitialized() {
         created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
         updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS security_permissions (
+        action_key TEXT PRIMARY KEY NOT NULL,
+        title TEXT NOT NULL,
+        action_group TEXT DEFAULT 'DELETE' NOT NULL,
+        is_enabled INTEGER DEFAULT 1 NOT NULL,
+        updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+      );
     `);
 
     // Safe column migrations for existing databases
@@ -101,6 +108,21 @@ export function ensureDatabaseInitialized() {
       expoDb.execSync(
         "ALTER TABLE app_settings ADD COLUMN biometrics_enabled INTEGER DEFAULT 0 NOT NULL;"
       );
+    } catch {}
+
+    // Seed default security permissions
+    try {
+      expoDb.execSync(`
+        INSERT OR IGNORE INTO security_permissions (action_key, title, action_group, is_enabled) VALUES
+          ('delete_transaction', 'Delete Transactions', 'DELETE', 1),
+          ('delete_account', 'Delete Accounts & Assets', 'DELETE', 1),
+          ('delete_contact', 'Delete Contacts', 'DELETE', 1),
+          ('delete_debt', 'Delete Debts', 'DELETE', 1),
+          ('create_transaction', 'Create Transaction', 'CREATE', 0),
+          ('create_account', 'Create Account', 'CREATE', 0),
+          ('backup_restore', 'Backup & Restore Data', 'SYSTEM', 1),
+          ('reset_data', 'Erase & Reset All Data', 'SYSTEM', 1);
+      `);
     } catch {}
 
     isMigrated = true;

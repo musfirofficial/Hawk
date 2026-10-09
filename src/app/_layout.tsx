@@ -45,6 +45,27 @@ function NavigationGate() {
         }}
       />
       <Stack.Screen
+        name="change-pin"
+        options={{
+          headerShown: false,
+          presentation: "card",
+        }}
+      />
+      <Stack.Screen
+        name="security-permissions"
+        options={{
+          headerShown: false,
+          presentation: "card",
+        }}
+      />
+      <Stack.Screen
+        name="edit-profile"
+        options={{
+          headerShown: false,
+          presentation: "card",
+        }}
+      />
+      <Stack.Screen
         name="fulltransaction"
         options={{
           headerShown: false,

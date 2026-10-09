@@ -232,6 +232,22 @@ export type AppSettings = typeof appSettings.$inferSelect;
 export type NewAppSettings = typeof appSettings.$inferInsert;
 
 // ==========================================
+// 8. Security Permissions / Protected Actions Table
+// ==========================================
+export const securityPermissions = sqliteTable("security_permissions", {
+  actionKey: text("action_key").primaryKey(), // e.g. 'delete_transaction'
+  title: text("title").notNull(),
+  actionGroup: text("action_group").default("DELETE").notNull(), // 'DELETE' | 'CREATE' | 'SYSTEM'
+  isEnabled: integer("is_enabled", { mode: "boolean" }).default(true).notNull(),
+  updatedAt: text("updated_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
+});
+
+export type SecurityPermission = typeof securityPermissions.$inferSelect;
+export type NewSecurityPermission = typeof securityPermissions.$inferInsert;
+
+// ==========================================
 // Drizzle Relations
 // ==========================================
 export const liquidAssetsRelations = relations(liquidAssets, ({ many }) => ({
