@@ -91,11 +91,18 @@ export function ensureDatabaseInitialized() {
         created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
         updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
       );
-      CREATE TABLE IF NOT EXISTS security_permissions (
-        action_key TEXT PRIMARY KEY NOT NULL,
-        title TEXT NOT NULL,
-        action_group TEXT DEFAULT 'DELETE' NOT NULL,
-        is_enabled INTEGER DEFAULT 1 NOT NULL,
+      CREATE TABLE IF NOT EXISTS security_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        delete_transaction INTEGER DEFAULT 1 NOT NULL,
+        delete_account INTEGER DEFAULT 1 NOT NULL,
+        delete_contact INTEGER DEFAULT 1 NOT NULL,
+        delete_debt INTEGER DEFAULT 1 NOT NULL,
+        create_transaction INTEGER DEFAULT 0 NOT NULL,
+        create_account INTEGER DEFAULT 0 NOT NULL,
+        edit_profile INTEGER DEFAULT 1 NOT NULL,
+        manage_account INTEGER DEFAULT 1 NOT NULL,
+        backup_restore INTEGER DEFAULT 1 NOT NULL,
+        reset_data INTEGER DEFAULT 1 NOT NULL,
         updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
       );
     `);
@@ -110,20 +117,14 @@ export function ensureDatabaseInitialized() {
       );
     } catch {}
 
-    // Seed default security permissions
+    // Ensure single-row security_rules record exists
     try {
       expoDb.execSync(`
-        INSERT OR IGNORE INTO security_permissions (action_key, title, action_group, is_enabled) VALUES
-          ('delete_transaction', 'Delete Transactions', 'DELETE', 1),
-          ('delete_account', 'Delete Accounts & Assets', 'DELETE', 1),
-          ('delete_contact', 'Delete Contacts', 'DELETE', 1),
-          ('delete_debt', 'Delete Debts', 'DELETE', 1),
-          ('create_transaction', 'Create Transaction', 'CREATE', 0),
-          ('create_account', 'Create Account', 'CREATE', 0),
-          ('edit_profile', 'Edit Profile & Details', 'SYSTEM', 1),
-          ('manage_account', 'Connect or Disconnect Mail', 'SYSTEM', 1),
-          ('backup_restore', 'Backup & Restore Data', 'SYSTEM', 1),
-          ('reset_data', 'Erase & Reset All Data', 'SYSTEM', 1);
+        INSERT OR IGNORE INTO security_rules (
+          id, delete_transaction, delete_account, delete_contact, delete_debt,
+          create_transaction, create_account, edit_profile, manage_account,
+          backup_restore, reset_data
+        ) VALUES (1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1);
       `);
     } catch {}
 

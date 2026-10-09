@@ -3,10 +3,10 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { SecurityGuardModal } from "../components/SecurityGuardModal";
 import { db, ensureDatabaseInitialized } from "../db";
 import * as schema from "../db/schema";
-import { SecurityPermission } from "../db/schema";
+import { SecurityRuleKey, SecurityRules } from "../db/schema";
 
 export interface SecurityRequest {
-  actionKey?: string;
+  ruleKey?: SecurityRuleKey;
   title?: string;
   description?: string;
   onSuccess: () => void;
@@ -15,9 +15,9 @@ export interface SecurityRequest {
 
 export interface SecurityContextType {
   requireSecurityAuth: (request: SecurityRequest) => void;
-  permissions: SecurityPermission[];
-  togglePermission: (actionKey: string, enabled: boolean) => Promise<void>;
-  reloadPermissions: () => void;
+  rules: SecurityRules | null;
+  updateRule: (key: SecurityRuleKey, enabled: boolean) => Promise<void>;
+  reloadRules: () => void;
 }
 
 const SecurityContext = createContext<SecurityContextType | undefined>(
@@ -28,45 +28,46 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
   const [activeRequest, setActiveRequest] = useState<SecurityRequest | null>(
     null
   );
-  const [permissions, setPermissions] = useState<SecurityPermission[]>([]);
+  const [rules, setRules] = useState<SecurityRules | null>(null);
 
   useEffect(() => {
-    loadPermissions();
+    loadRules();
   }, []);
 
-  function loadPermissions() {
+  function loadRules() {
     try {
       ensureDatabaseInitialized();
-      const rows = db.select().from(schema.securityPermissions).all();
-      setPermissions(rows);
+      const rows = db.select().from(schema.securityRules).limit(1).all();
+      if (rows && rows.length > 0) {
+        setRules(rows[0]);
+      }
     } catch (err) {
-      console.warn("Failed to load security permissions:", err);
+      console.warn("Failed to load security rules:", err);
     }
   }
 
-  async function togglePermission(actionKey: string, enabled: boolean) {
+  async function updateRule(key: SecurityRuleKey, enabled: boolean) {
     try {
       ensureDatabaseInitialized();
-      db.update(schema.securityPermissions)
+      db.update(schema.securityRules)
         .set({
-          isEnabled: enabled,
+          [key]: enabled,
           updatedAt: new Date().toISOString(),
         })
-        .where(eq(schema.securityPermissions.actionKey, actionKey))
+        .where(eq(schema.securityRules.id, 1))
         .run();
-      loadPermissions();
+      loadRules();
     } catch (err) {
-      console.error("Failed to toggle security permission:", err);
+      console.error("Failed to update security rule:", err);
       throw err;
     }
   }
 
   function requireSecurityAuth(request: SecurityRequest) {
-    // If an actionKey is specified, verify if protection is enabled for it
-    if (request.actionKey) {
-      const perm = permissions.find((p) => p.actionKey === request.actionKey);
-      if (perm && !perm.isEnabled) {
-        // Security check is disabled by user for this action -> bypass directly
+    if (request.ruleKey && rules) {
+      const isEnabled = Boolean(rules[request.ruleKey]);
+      if (!isEnabled) {
+        // Protection is toggled OFF for this rule -> execute immediately
         request.onSuccess();
         return;
       }
@@ -95,9 +96,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     <SecurityContext.Provider
       value={{
         requireSecurityAuth,
-        permissions,
-        togglePermission,
-        reloadPermissions: loadPermissions,
+        rules,
+        updateRule,
+        reloadRules: loadRules,
       }}
     >
       {children}

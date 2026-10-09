@@ -54,7 +54,7 @@ export default function SettingsScreen() {
   // Guarded Edit Profile
   function handleEditProfilePress() {
     requireSecurityAuth({
-      actionKey: "edit_profile",
+      ruleKey: "editProfile",
       title: "Verify Identity",
       description: "Verify your identity to edit profile details",
       onSuccess: () => {
@@ -66,7 +66,7 @@ export default function SettingsScreen() {
   // Guarded Google Account / Mail action
   function handleGooglePress() {
     requireSecurityAuth({
-      actionKey: "manage_account",
+      ruleKey: "manageAccount",
       title: "Verify Identity",
       description: "Verify your identity to manage connected accounts",
       onSuccess: () => {
@@ -146,7 +146,7 @@ export default function SettingsScreen() {
 
   function handleBackup() {
     requireSecurityAuth({
-      actionKey: "backup_restore",
+      ruleKey: "backupRestore",
       title: "Confirm Cloud Backup",
       onSuccess: () => {
         Alert.alert("Success", "Database backed up successfully.");
@@ -156,7 +156,7 @@ export default function SettingsScreen() {
 
   function handleRestore() {
     requireSecurityAuth({
-      actionKey: "backup_restore",
+      ruleKey: "backupRestore",
       title: "Confirm Data Retrieval",
       onSuccess: () => {
         Alert.alert("Success", "Database restored successfully.");
@@ -166,7 +166,7 @@ export default function SettingsScreen() {
 
   function handleResetData() {
     requireSecurityAuth({
-      actionKey: "reset_data",
+      ruleKey: "resetData",
       title: "Authorize Reset",
       onSuccess: () => {
         Alert.alert(

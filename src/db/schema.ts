@@ -232,20 +232,51 @@ export type AppSettings = typeof appSettings.$inferSelect;
 export type NewAppSettings = typeof appSettings.$inferInsert;
 
 // ==========================================
-// 8. Security Permissions / Protected Actions Table
+// 8. Security Rules / Protected Actions Table (Column-based)
 // ==========================================
-export const securityPermissions = sqliteTable("security_permissions", {
-  actionKey: text("action_key").primaryKey(), // e.g. 'delete_transaction'
-  title: text("title").notNull(),
-  actionGroup: text("action_group").default("DELETE").notNull(), // 'DELETE' | 'CREATE' | 'SYSTEM'
-  isEnabled: integer("is_enabled", { mode: "boolean" }).default(true).notNull(),
+export const securityRules = sqliteTable("security_rules", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  // Deletions
+  deleteTransaction: integer("delete_transaction", { mode: "boolean" })
+    .default(true)
+    .notNull(),
+  deleteAccount: integer("delete_account", { mode: "boolean" })
+    .default(true)
+    .notNull(),
+  deleteContact: integer("delete_contact", { mode: "boolean" })
+    .default(true)
+    .notNull(),
+  deleteDebt: integer("delete_debt", { mode: "boolean" })
+    .default(true)
+    .notNull(),
+  // Creations
+  createTransaction: integer("create_transaction", { mode: "boolean" })
+    .default(false)
+    .notNull(),
+  createAccount: integer("create_account", { mode: "boolean" })
+    .default(false)
+    .notNull(),
+  // Account & System
+  editProfile: integer("edit_profile", { mode: "boolean" })
+    .default(true)
+    .notNull(),
+  manageAccount: integer("manage_account", { mode: "boolean" })
+    .default(true)
+    .notNull(),
+  backupRestore: integer("backup_restore", { mode: "boolean" })
+    .default(true)
+    .notNull(),
+  resetData: integer("reset_data", { mode: "boolean" })
+    .default(true)
+    .notNull(),
   updatedAt: text("updated_at")
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),
 });
 
-export type SecurityPermission = typeof securityPermissions.$inferSelect;
-export type NewSecurityPermission = typeof securityPermissions.$inferInsert;
+export type SecurityRules = typeof securityRules.$inferSelect;
+export type NewSecurityRules = typeof securityRules.$inferInsert;
+export type SecurityRuleKey = keyof Omit<SecurityRules, "id" | "updatedAt">;
 
 // ==========================================
 // Drizzle Relations
