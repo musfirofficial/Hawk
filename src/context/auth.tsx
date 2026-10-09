@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   function loadSettingsFromDB() {
     try {
+      ensureDatabaseInitialized();
       const rows = db.select().from(schema.appSettings).limit(1).all();
       if (rows && rows.length > 0) {
         const current = rows[0];

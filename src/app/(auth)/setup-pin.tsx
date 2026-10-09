@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -103,7 +103,10 @@ export default function SetupPinScreen() {
     }
   }
 
-  async function finalizePinSetup(pinToSave: string, enableBiometrics: boolean) {
+  async function finalizePinSetup(
+    pinToSave: string,
+    enableBiometrics: boolean,
+  ) {
     try {
       setSaving(true);
       setErrorMsg(null);
@@ -147,7 +150,7 @@ export default function SetupPinScreen() {
     setBioModalVisible(false);
     // Test biometric prompt once to ensure authorization
     const testResult = await authenticateWithBiometrics(
-      `Authenticate with ${bioCapability.label} to enable`
+      `Authenticate with ${bioCapability.label} to enable`,
     );
     finalizePinSetup(createdPin, testResult.success);
   }
@@ -178,9 +181,6 @@ export default function SetupPinScreen() {
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
 
-        <Text className="text-dark-muted text-xs font-semibold uppercase tracking-widest">
-          Security Setup
-        </Text>
         <View className="w-10" />
       </View>
 
@@ -313,11 +313,7 @@ export default function SetupPinScreen() {
       )}
 
       {/* Enable Biometrics Prompt Modal */}
-      <Modal
-        visible={bioModalVisible}
-        transparent={true}
-        animationType="fade"
-      >
+      <Modal visible={bioModalVisible} transparent={true} animationType="fade">
         <View className="flex-1 bg-black/80 items-center justify-center px-6">
           <View className="w-full max-w-sm bg-dark-surface border border-dark-border rounded-3xl p-6 items-center shadow-2xl">
             <View className="w-16 h-16 rounded-full bg-brand-accent/15 border border-brand-accent/40 items-center justify-center mb-4">
