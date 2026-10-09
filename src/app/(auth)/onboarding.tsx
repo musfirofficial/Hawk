@@ -107,18 +107,18 @@ export default function OnboardingScreen() {
       setSubmitting(true);
       setErrorMsg(null);
 
-      await completeOnboarding({
-        userName: name.trim(),
-        currency: selectedCurrency,
-        numberFormat: selectedFormat,
-        profilePic: profilePic || null,
+      router.push({
+        pathname: "/(auth)/setup-pin" as any,
+        params: {
+          userName: name.trim(),
+          currency: selectedCurrency,
+          numberFormat: selectedFormat,
+          profilePic: profilePic || "",
+        },
       });
-
-      // Redirect into main app tabs
-      router.replace("/(tabs)");
     } catch (err) {
-      console.error("Onboarding failed:", err);
-      setErrorMsg("Failed to save profile. Please try again.");
+      console.error("Onboarding error:", err);
+      setErrorMsg("Failed to proceed. Please try again.");
     } finally {
       setSubmitting(false);
     }

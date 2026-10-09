@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../context/auth";
+import { SecurityProvider } from "../context/security";
 import "../../global.css";
 
 function NavigationGate() {
@@ -58,7 +59,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <NavigationGate />
+        <SecurityProvider>
+          <NavigationGate />
+        </SecurityProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

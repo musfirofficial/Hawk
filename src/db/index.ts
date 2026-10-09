@@ -90,15 +90,38 @@ export function ensureDatabaseInitialized() {
           has_onboarded INTEGER DEFAULT 0 NOT NULL,
           last_backup TEXT,
           profile_pic TEXT,
+          pin TEXT,
+          biometrics_enabled INTEGER DEFAULT 0 NOT NULL,
           google_email TEXT,
           google_name TEXT,
           created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
           updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
         );
       `);
+
+      // Safe column migration for existing databases
+      try {
+        expoDb.execSync("ALTER TABLE app_settings ADD COLUMN pin TEXT;");
+      } catch {}
+      try {
+        expoDb.execSync(
+          "ALTER TABLE app_settings ADD COLUMN biometrics_enabled INTEGER DEFAULT 0 NOT NULL;"
+        );
+      } catch {}
+
       isMigrated = true;
     } catch (fallbackErr) {
       console.error("Critical: Could not initialize database fallback tables:", fallbackErr);
     }
   }
+
+  // Also ensure columns exist even if Drizzle migrator succeeded
+  try {
+    expoDb.execSync("ALTER TABLE app_settings ADD COLUMN pin TEXT;");
+  } catch {}
+  try {
+    expoDb.execSync(
+      "ALTER TABLE app_settings ADD COLUMN biometrics_enabled INTEGER DEFAULT 0 NOT NULL;"
+    );
+  } catch {}
 }

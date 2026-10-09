@@ -41,7 +41,13 @@
       ],
       "expo-sqlite",
       "@react-native-google-signin/google-signin",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Hawk to use Face ID for biometric authentication."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

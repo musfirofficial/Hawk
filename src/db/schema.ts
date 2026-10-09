@@ -214,6 +214,10 @@ export const appSettings = sqliteTable("app_settings", {
     .notNull(),
   lastBackup: text("last_backup"), // Timestamp of last Google Drive backup
   profilePic: text("profile_pic"), // Local path/URI only, excluded from cloud sync
+  pin: text("pin"), // 4-digit security PIN
+  biometricsEnabled: integer("biometrics_enabled", { mode: "boolean" })
+    .default(false)
+    .notNull(),
   googleEmail: text("google_email"),
   googleName: text("google_name"),
   createdAt: text("created_at")

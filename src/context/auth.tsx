@@ -26,6 +26,12 @@ interface AuthContextType {
     currency: string;
     numberFormat: NumberFormatId;
     profilePic?: string | null;
+    pin?: string;
+    biometricsEnabled?: boolean;
+  }) => Promise<void>;
+  updateSecuritySettings: (params: {
+    pin?: string;
+    biometricsEnabled?: boolean;
   }) => Promise<void>;
   disconnectGoogle: () => Promise<void>;
   reloadSettings: () => void;
@@ -102,6 +108,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     currency: string;
     numberFormat: NumberFormatId;
     profilePic?: string | null;
+    pin?: string;
+    biometricsEnabled?: boolean;
   }) {
     try {
       ensureDatabaseInitialized();
@@ -117,6 +125,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             currency: params.currency,
             numberFormat: params.numberFormat,
             profilePic: params.profilePic || null,
+            pin: params.pin !== undefined ? params.pin : existing[0].pin,
+            biometricsEnabled:
+              params.biometricsEnabled !== undefined
+                ? params.biometricsEnabled
+                : existing[0].biometricsEnabled,
             googleEmail: googleEmail || existing[0].googleEmail,
             googleName: googleName || existing[0].googleName,
             hasOnboarded: true,
@@ -131,6 +144,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             currency: params.currency,
             numberFormat: params.numberFormat,
             profilePic: params.profilePic || null,
+            pin: params.pin || null,
+            biometricsEnabled: params.biometricsEnabled || false,
             googleEmail,
             googleName,
             hasOnboarded: true,
@@ -142,6 +157,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loadSettingsFromDB();
     } catch (err) {
       console.error("Failed to complete onboarding:", err);
+      throw err;
+    }
+  }
+
+  // Update Security Settings (PIN and/or Biometrics)
+  async function updateSecuritySettings(params: {
+    pin?: string;
+    biometricsEnabled?: boolean;
+  }) {
+    try {
+      ensureDatabaseInitialized();
+      const existing = db.select().from(schema.appSettings).limit(1).all();
+      if (existing.length > 0) {
+        db.update(schema.appSettings)
+          .set({
+            ...(params.pin !== undefined && { pin: params.pin }),
+            ...(params.biometricsEnabled !== undefined && {
+              biometricsEnabled: params.biometricsEnabled,
+            }),
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(schema.appSettings.id, existing[0].id))
+          .run();
+        loadSettingsFromDB();
+      }
+    } catch (err) {
+      console.error("Failed to update security settings:", err);
       throw err;
     }
   }
@@ -181,6 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPendingGoogleUser,
         signInWithGoogle,
         completeOnboarding,
+        updateSecuritySettings,
         disconnectGoogle,
         reloadSettings: loadSettingsFromDB,
       }}
