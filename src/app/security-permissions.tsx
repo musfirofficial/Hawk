@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
-import { ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { HawkToggle } from "../components/HawkToggle";
 import { useSecurityGuard } from "../context/security";
 
 export default function SecurityPermissionsScreen() {
@@ -53,11 +54,9 @@ export default function SecurityPermissionsScreen() {
                 <Text className="text-dark-text font-medium text-sm">
                   {item.title}
                 </Text>
-                <Switch
+                <HawkToggle
                   value={Boolean(item.isEnabled)}
                   onValueChange={(val) => togglePermission(item.actionKey, val)}
-                  trackColor={{ false: "#333A4D", true: "#D4F938" }}
-                  thumbColor={item.isEnabled ? "#0B0D12" : "#FFFFFF"}
                 />
               </View>
             ))}
@@ -82,11 +81,9 @@ export default function SecurityPermissionsScreen() {
                 <Text className="text-dark-text font-medium text-sm">
                   {item.title}
                 </Text>
-                <Switch
+                <HawkToggle
                   value={Boolean(item.isEnabled)}
                   onValueChange={(val) => togglePermission(item.actionKey, val)}
-                  trackColor={{ false: "#333A4D", true: "#D4F938" }}
-                  thumbColor={item.isEnabled ? "#0B0D12" : "#FFFFFF"}
                 />
               </View>
             ))}
@@ -96,7 +93,7 @@ export default function SecurityPermissionsScreen() {
         {/* System & Data Section */}
         <View className="mb-6">
           <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-2 ml-1">
-            System & Data
+            Account & System
           </Text>
           <View className="bg-dark-surface rounded-2xl border border-dark-border overflow-hidden">
             {systemActions.map((item, idx) => (
@@ -111,11 +108,9 @@ export default function SecurityPermissionsScreen() {
                 <Text className="text-dark-text font-medium text-sm">
                   {item.title}
                 </Text>
-                <Switch
+                <HawkToggle
                   value={Boolean(item.isEnabled)}
                   onValueChange={(val) => togglePermission(item.actionKey, val)}
-                  trackColor={{ false: "#333A4D", true: "#D4F938" }}
-                  thumbColor={item.isEnabled ? "#0B0D12" : "#FFFFFF"}
                 />
               </View>
             ))}

@@ -120,6 +120,8 @@ export function ensureDatabaseInitialized() {
           ('delete_debt', 'Delete Debts', 'DELETE', 1),
           ('create_transaction', 'Create Transaction', 'CREATE', 0),
           ('create_account', 'Create Account', 'CREATE', 0),
+          ('edit_profile', 'Edit Profile & Details', 'SYSTEM', 1),
+          ('manage_account', 'Connect or Disconnect Mail', 'SYSTEM', 1),
           ('backup_restore', 'Backup & Restore Data', 'SYSTEM', 1),
           ('reset_data', 'Erase & Reset All Data', 'SYSTEM', 1);
       `);

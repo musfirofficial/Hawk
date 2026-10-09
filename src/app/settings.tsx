@@ -7,12 +7,12 @@ import {
   Alert,
   Image,
   ScrollView,
-  Switch,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { HawkToggle } from "../components/HawkToggle";
 import { useAuth } from "../context/auth";
 import { useSecurityGuard } from "../context/security";
 import { db } from "../db";
@@ -51,7 +51,31 @@ export default function SettingsScreen() {
     loadBio();
   }, []);
 
-  async function handleGooglePress() {
+  // Guarded Edit Profile
+  function handleEditProfilePress() {
+    requireSecurityAuth({
+      actionKey: "edit_profile",
+      title: "Verify Identity",
+      description: "Verify your identity to edit profile details",
+      onSuccess: () => {
+        router.push("/edit-profile" as any);
+      },
+    });
+  }
+
+  // Guarded Google Account / Mail action
+  function handleGooglePress() {
+    requireSecurityAuth({
+      actionKey: "manage_account",
+      title: "Verify Identity",
+      description: "Verify your identity to manage connected accounts",
+      onSuccess: () => {
+        executeGoogleAccountAction();
+      },
+    });
+  }
+
+  async function executeGoogleAccountAction() {
     if (settings?.googleEmail) {
       Alert.alert(
         "Google Account",
@@ -111,6 +135,17 @@ export default function SettingsScreen() {
     } else {
       await updateSecuritySettings({ biometricsEnabled: false });
     }
+  }
+
+  // Guarded Security Checks Page
+  function handleOpenSecurityChecks() {
+    requireSecurityAuth({
+      title: "Security Checks",
+      description: "Verify your identity to modify security rules",
+      onSuccess: () => {
+        router.push("/security-permissions" as any);
+      },
+    });
   }
 
   function handleBackup() {
@@ -182,14 +217,14 @@ export default function SettingsScreen() {
         contentContainerStyle={{ paddingBottom: 40 }}
         className="flex-1 px-5 pt-5"
       >
-        {/* Profile Card (Matching Mockup) */}
+        {/* Profile Card (Guarded with Security Auth) */}
         <TouchableOpacity
-          onPress={() => router.push("/edit-profile" as any)}
+          onPress={handleEditProfilePress}
           className="bg-dark-surface p-4 rounded-3xl border border-dark-border flex-row items-center justify-between mb-5 active:bg-dark-card"
           activeOpacity={0.7}
         >
           <View className="flex-row items-center gap-3.5">
-            <View className="w-13 h-13 w-12 h-12 rounded-full bg-dark-card border border-dark-border items-center justify-center overflow-hidden">
+            <View className="w-12 h-12 rounded-full bg-dark-card border border-dark-border items-center justify-center overflow-hidden">
               {settings?.profilePic ? (
                 <Image
                   source={{ uri: settings.profilePic }}
@@ -216,7 +251,7 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={18} color="#60677C" />
         </TouchableOpacity>
 
-        {/* 1. Account / Mail Section */}
+        {/* 1. Account / Mail Section (Guarded) */}
         <View className="bg-dark-surface rounded-2xl border border-dark-border overflow-hidden mb-4">
           <TouchableOpacity
             onPress={handleGooglePress}
@@ -261,7 +296,7 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward" size={18} color="#60677C" />
           </TouchableOpacity>
 
-          {/* Biometrics Toggler */}
+          {/* Biometrics Toggler (Custom HawkToggle with zero ripple) */}
           <View className="p-4 flex-row items-center justify-between border-b border-dark-border/40">
             <View className="flex-row items-center gap-3.5">
               <Ionicons
@@ -280,18 +315,16 @@ export default function SettingsScreen() {
               </Text>
             </View>
 
-            <Switch
+            <HawkToggle
               value={Boolean(settings?.biometricsEnabled)}
               onValueChange={handleToggleBiometrics}
               disabled={!bioCapability.isAvailable}
-              trackColor={{ false: "#333A4D", true: "#D4F938" }}
-              thumbColor={settings?.biometricsEnabled ? "#0B0D12" : "#FFFFFF"}
             />
           </View>
 
-          {/* Security Permissions (New Page) */}
+          {/* Security Permissions (Guarded with PIN) */}
           <TouchableOpacity
-            onPress={() => router.push("/security-permissions" as any)}
+            onPress={handleOpenSecurityChecks}
             className="p-4 flex-row items-center justify-between"
             activeOpacity={0.7}
           >
@@ -346,11 +379,9 @@ export default function SettingsScreen() {
                 Dark Mode
               </Text>
             </View>
-            <Switch
+            <HawkToggle
               value={darkModePlaceholder}
               onValueChange={setDarkModePlaceholder}
-              trackColor={{ false: "#333A4D", true: "#D4F938" }}
-              thumbColor={darkModePlaceholder ? "#0B0D12" : "#FFFFFF"}
             />
           </View>
 
