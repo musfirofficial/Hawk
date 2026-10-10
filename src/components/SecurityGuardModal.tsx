@@ -1,19 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Modal,
   Platform,
   Text,
   TouchableOpacity,
   Vibration,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../context/auth";
 import {
   authenticateWithBiometrics,
   getBiometricCapability,
 } from "../services/biometrics";
+import { HawkModal } from "./HawkModal";
 
 export interface SecurityGuardModalProps {
   visible: boolean;
@@ -73,7 +72,7 @@ export function SecurityGuardModal({
         setTimeout(async () => {
           if (!isMounted) return;
           const res = await authenticateWithBiometrics(
-            description || title || "Confirm Action"
+            description || title || "Confirm Action",
           );
           if (res.success && isMounted) {
             onSuccess();
@@ -95,7 +94,7 @@ export function SecurityGuardModal({
   async function handleManualBiometric() {
     setErrorMsg(null);
     const res = await authenticateWithBiometrics(
-      description || title || "Confirm Action"
+      description || title || "Confirm Action",
     );
     if (res.success) {
       onSuccess();
@@ -141,14 +140,9 @@ export function SecurityGuardModal({
   if (!visible) return null;
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onCancel}
-    >
+    <HawkModal visible={visible} animationType="fade" onRequestClose={onCancel}>
       <View className="flex-1 bg-black/80 justify-center items-center px-6">
-        <SafeAreaView className="w-full max-w-sm bg-dark-surface border border-dark-border rounded-3xl p-6 items-center shadow-2xl">
+        <View className="w-full max-w-sm bg-dark-surface border border-dark-border rounded-3xl p-6 items-center shadow-2xl">
           {/* ======================================================== */}
           {/* VIEW 1: DYNAMIC BIOMETRIC FIRST VIEW */}
           {/* ======================================================== */}
@@ -182,11 +176,11 @@ export function SecurityGuardModal({
                   `Authenticate with ${biometricLabel} to complete verification`}
               </Text>
 
-              {errorMsg && (
+              {/* {errorMsg && (
                 <Text className="text-brand-expense text-xs font-semibold text-center mb-4">
                   {errorMsg}
                 </Text>
-              )}
+              )} */}
 
               {/* Verify Button */}
               <TouchableOpacity
@@ -374,9 +368,9 @@ export function SecurityGuardModal({
               </TouchableOpacity>
             </View>
           )}
-        </SafeAreaView>
+        </View>
       </View>
-    </Modal>
+    </HawkModal>
   );
 }
 

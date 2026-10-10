@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   Text,
@@ -12,19 +11,22 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { HawkToggle } from "../components/HawkToggle";
-import { useAuth } from "../context/auth";
-import { useSecurityGuard } from "../context/security";
-import { db } from "../db";
-import * as schema from "../db/schema";
+import { HawkToggle } from "../../components/HawkToggle";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { useAlert } from "../../context/alert";
+import { useAuth } from "../../context/auth";
+import { useSecurityGuard } from "../../context/security";
+import { db } from "../../db";
+import * as schema from "../../db/schema";
 import {
   authenticateWithBiometrics,
   BiometricCapability,
   getBiometricCapability,
-} from "../services/biometrics";
+} from "../../services/biometrics";
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { showAlert, showConfirm } = useAlert();
   const {
     settings,
     signInWithGoogle,
@@ -77,23 +79,23 @@ export default function SettingsScreen() {
 
   async function executeGoogleAccountAction() {
     if (settings?.googleEmail) {
-      Alert.alert("Google Account", `Connected as ${settings.googleEmail}`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Disconnect",
-          style: "destructive",
-          onPress: () => disconnectGoogle(),
-        },
-      ]);
+      showConfirm({
+        title: "Google Account",
+        message: `Connected as ${settings.googleEmail}. Do you want to disconnect?`,
+        type: "warning",
+        confirmText: "Disconnect",
+        isDestructive: true,
+        onConfirm: () => disconnectGoogle(),
+      });
       return;
     }
 
     if (!isGoogleAuthEnabled) {
-      Alert.alert(
-        "Cloud Sync",
-        "Google Sign-In is disabled in config (ENABLE_GOOGLE_AUTH).",
-        [{ text: "OK" }],
-      );
+      showAlert({
+        title: "Cloud Sync",
+        message: "Google Sign-In is disabled in config (ENABLE_GOOGLE_AUTH).",
+        type: "info",
+      });
       return;
     }
 
@@ -113,7 +115,11 @@ export default function SettingsScreen() {
       }
     } catch (err: any) {
       if (err?.code !== "12501") {
-        Alert.alert("Connection Error", err?.message || "Sign-in failed.");
+        showAlert({
+          title: "Connection Error",
+          message: err?.message || "Sign-in failed.",
+          type: "danger",
+        });
       }
     } finally {
       setConnecting(false);
@@ -149,7 +155,11 @@ export default function SettingsScreen() {
       ruleKey: "backupRestore",
       title: "Confirm Cloud Backup",
       onSuccess: () => {
-        Alert.alert("Success", "Database backed up successfully.");
+        showAlert({
+          title: "Success",
+          message: "Database backed up successfully.",
+          type: "success",
+        });
       },
     });
   }
@@ -159,7 +169,11 @@ export default function SettingsScreen() {
       ruleKey: "backupRestore",
       title: "Confirm Data Retrieval",
       onSuccess: () => {
-        Alert.alert("Success", "Database restored successfully.");
+        showAlert({
+          title: "Success",
+          message: "Database restored successfully.",
+          type: "success",
+        });
       },
     });
   }
@@ -169,24 +183,25 @@ export default function SettingsScreen() {
       ruleKey: "resetData",
       title: "Authorize Reset",
       onSuccess: () => {
-        Alert.alert(
-          "Erase & Reset Data",
-          "Are you sure you want to delete all accounts and transactions? This cannot be undone.",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Erase All",
-              style: "destructive",
-              onPress: () => {
-                db.delete(schema.transactions).run();
-                db.delete(schema.liquidAssets).run();
-                db.delete(schema.contacts).run();
-                reloadSettings();
-                Alert.alert("Reset Complete", "All data has been cleared.");
-              },
-            },
-          ],
-        );
+        showConfirm({
+          title: "Erase & Reset Data",
+          message:
+            "Are you sure you want to delete all accounts and transactions? This cannot be undone.",
+          type: "danger",
+          confirmText: "Erase All",
+          isDestructive: true,
+          onConfirm: () => {
+            db.delete(schema.transactions).run();
+            db.delete(schema.liquidAssets).run();
+            db.delete(schema.contacts).run();
+            reloadSettings();
+            showAlert({
+              title: "Reset Complete",
+              message: "All data has been cleared.",
+              type: "success",
+            });
+          },
+        });
       },
     });
   }
@@ -195,18 +210,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-dark-bg">
-      {/* Top Header */}
-      <View className="px-5 pt-3 pb-3 flex-row items-center justify-between border-b border-dark-border/30">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="w-10 h-10 rounded-full bg-dark-surface border border-dark-border items-center justify-center -ml-1"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={20} color="#F8FAFC" />
-        </TouchableOpacity>
-        <Text className="text-dark-text text-lg font-bold">Settings</Text>
-        <View className="w-10" />
-      </View>
+      <ScreenHeader title="Settings" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -395,7 +399,11 @@ export default function SettingsScreen() {
           {/* Language */}
           <TouchableOpacity
             onPress={() =>
-              Alert.alert("Language", "Additional languages coming soon.")
+              showAlert({
+                title: "Language",
+                message: "Additional languages coming soon.",
+                type: "info",
+              })
             }
             className="p-4 flex-row items-center justify-between"
             activeOpacity={0.7}

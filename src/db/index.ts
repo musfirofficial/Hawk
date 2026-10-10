@@ -116,6 +116,11 @@ export function ensureDatabaseInitialized() {
         "ALTER TABLE app_settings ADD COLUMN biometrics_enabled INTEGER DEFAULT 0 NOT NULL;"
       );
     } catch {}
+    try {
+      expoDb.execSync(
+        "ALTER TABLE debts ADD COLUMN is_archived INTEGER DEFAULT 0 NOT NULL;"
+      );
+    } catch {}
 
     // Ensure single-row security_rules record exists
     try {
@@ -125,6 +130,25 @@ export function ensureDatabaseInitialized() {
           create_transaction, create_account, edit_profile, manage_account,
           backup_restore, reset_data
         ) VALUES (1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1);
+      `);
+    } catch {}
+
+    // Seed default categories
+    try {
+      expoDb.execSync(`
+        INSERT OR IGNORE INTO categories (id, name, icon) VALUES
+        (1, 'Salary', 'cash-outline'),
+        (2, 'Freelance', 'laptop-outline'),
+        (3, 'Investments', 'trending-up-outline'),
+        (4, 'Gift / Allowance', 'gift-outline'),
+        (5, 'Food & Groceries', 'fast-food-outline'),
+        (6, 'Shopping', 'cart-outline'),
+        (7, 'Housing & Rent', 'home-outline'),
+        (8, 'Transportation', 'car-outline'),
+        (9, 'Utilities & Bills', 'flash-outline'),
+        (10, 'Entertainment', 'film-outline'),
+        (11, 'Healthcare', 'medkit-outline'),
+        (12, 'General', 'receipt-outline');
       `);
     } catch {}
 

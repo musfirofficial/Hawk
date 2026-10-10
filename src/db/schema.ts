@@ -104,14 +104,12 @@ export const contacts = sqliteTable("contacts", {
 });
 
 // ==========================================
-// 3. Categories Table (For Income & Expense)
+// 3. Categories Table
 // ==========================================
 export const categories = sqliteTable("categories", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(), // e.g. Food, Salary, Rent
-  type: text("type", { enum: CATEGORY_TYPES }).notNull(),
-  icon: text("icon"),
-  color: text("color"),
+  icon: text("icon"), // icon name (not unique)
   createdAt: text("created_at")
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),
@@ -134,6 +132,9 @@ export const debts = sqliteTable("debts", {
   isSettledManually: integer("is_settled_manually", { mode: "boolean" })
     .default(false)
     .notNull(), // Manual settlement / forgiveness
+  isArchived: integer("is_archived", { mode: "boolean" })
+    .default(false)
+    .notNull(),
   note: text("note"),
   createdAt: text("created_at")
     .default(sql`(CURRENT_TIMESTAMP)`)

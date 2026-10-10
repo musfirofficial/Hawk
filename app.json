@@ -7,6 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "hawk",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0D12",
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.musfir.thahir.Hawk",
@@ -46,6 +47,14 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Allow Hawk to use Face ID for biometric authentication."
+        }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "style": "light",
+          "hidden": false,
+          "enforceContrast": false
         }
       ]
     ],

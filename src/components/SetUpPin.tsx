@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Modal,
   Platform,
   Text,
   TouchableOpacity,
@@ -10,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { HawkModal } from "./HawkModal";
 import {
   authenticateWithBiometrics,
   BiometricCapability,
@@ -295,7 +295,7 @@ export function SetUpPin({
       )}
 
       {/* Enable Biometrics Prompt Modal */}
-      <Modal visible={bioModalVisible} transparent={true} animationType="fade">
+      <HawkModal visible={bioModalVisible} transparent={true} animationType="fade">
         <View className="flex-1 bg-black/80 items-center justify-center px-6">
           <View className="w-full max-w-sm bg-dark-surface border border-dark-border rounded-3xl p-6 items-center shadow-2xl">
             <View className="w-16 h-16 rounded-full bg-brand-accent/15 border border-brand-accent/40 items-center justify-center mb-4">
@@ -340,7 +340,7 @@ export function SetUpPin({
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </HawkModal>
     </SafeAreaView>
   );
 }

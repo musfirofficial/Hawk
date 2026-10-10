@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   FlatList,
-  Modal,
   Pressable,
   Text,
   TextInput,
@@ -10,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { HawkModal } from "./HawkModal";
 import { SUPPORTED_CURRENCIES } from "../db/schema";
 
 interface CurrencyPickerProps {
@@ -38,7 +38,7 @@ export function CurrencyPicker({
   });
 
   return (
-    <Modal
+    <HawkModal
       visible={visible}
       animationType="slide"
       transparent={true}
@@ -132,6 +132,6 @@ export function CurrencyPicker({
           />
         </View>
       </View>
-    </Modal>
+    </HawkModal>
   );
 }

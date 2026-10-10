@@ -1,20 +1,25 @@
 import { useRouter } from "expo-router";
 import React from "react";
-import { Alert } from "react-native";
-import { SetUpPin } from "../components/SetUpPin";
-import { useAuth } from "../context/auth";
+import { SetUpPin } from "../../components/SetUpPin";
+import { useAlert } from "../../context/alert";
+import { useAuth } from "../../context/auth";
 
 export default function ChangePinScreen() {
   const router = useRouter();
   const { updateSecuritySettings } = useAuth();
+  const { showAlert } = useAlert();
 
   async function handleSuccess(pin: string, enableBiometrics: boolean) {
     await updateSecuritySettings({
       pin,
       biometricsEnabled: enableBiometrics,
     });
-    Alert.alert("Success", "Security PIN updated successfully.");
-    router.back();
+    showAlert({
+      title: "Success",
+      message: "Security PIN updated successfully.",
+      type: "success",
+      onDismiss: () => router.back(),
+    });
   }
 
   return (

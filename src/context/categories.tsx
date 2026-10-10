@@ -1,0 +1,188 @@
+import { eq } from "drizzle-orm";
+import { addDatabaseChangeListener } from "expo-sqlite";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { db, ensureDatabaseInitialized, expoDb } from "../db";
+import * as schema from "../db/schema";
+
+export interface CategoryItem {
+  id: number;
+  name: string;
+  icon: string | null;
+  transactionCount: number;
+}
+
+export interface CreateCategoryInput {
+  name: string;
+  icon?: string | null;
+}
+
+export interface UpdateCategoryInput {
+  name?: string;
+  icon?: string | null;
+}
+
+interface CategoriesContextType {
+  categories: CategoryItem[];
+  isLoading: boolean;
+  refreshCategories: () => void;
+  createCategory: (data: CreateCategoryInput) => Promise<number>;
+  updateCategory: (id: number, data: UpdateCategoryInput) => Promise<void>;
+  deleteCategory: (
+    id: number
+  ) => Promise<{ success: boolean; hasTransactions: boolean }>;
+}
+
+const CategoriesContext = createContext<CategoriesContextType | undefined>(
+  undefined
+);
+
+interface RawCategoryQueryRow {
+  id: number;
+  name: string;
+  icon: string | null;
+  transaction_count: number;
+}
+
+export function CategoriesProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadData = useCallback(() => {
+    try {
+      ensureDatabaseInitialized();
+
+      const rows = expoDb.getAllSync<RawCategoryQueryRow>(`
+        SELECT 
+          c.id,
+          c.name,
+          c.icon,
+          COUNT(t.id) AS transaction_count
+        FROM categories c
+        LEFT JOIN transactions t ON t.category_id = c.id
+        GROUP BY c.id
+        ORDER BY c.name ASC;
+      `);
+
+      const mapped: CategoryItem[] = rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        icon: r.icon,
+        transactionCount: Number(r.transaction_count) || 0,
+      }));
+
+      setCategories(mapped);
+    } catch (err) {
+      console.error("Failed to load categories:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+
+    let subscription: { remove: () => void } | undefined;
+    try {
+      subscription = addDatabaseChangeListener(() => {
+        loadData();
+      });
+    } catch (err) {
+      console.warn("addDatabaseChangeListener error for categories:", err);
+    }
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [loadData]);
+
+  const createCategory = useCallback(
+    async (data: CreateCategoryInput): Promise<number> => {
+      ensureDatabaseInitialized();
+
+      const inserted = db
+        .insert(schema.categories)
+        .values({
+          name: data.name.trim(),
+          icon: data.icon || "pricetag-outline",
+        })
+        .returning({ id: schema.categories.id })
+        .get();
+
+      loadData();
+      return inserted.id;
+    },
+    [loadData]
+  );
+
+  const updateCategory = useCallback(
+    async (id: number, data: UpdateCategoryInput) => {
+      ensureDatabaseInitialized();
+
+      db.update(schema.categories)
+        .set({
+          ...(data.name !== undefined && { name: data.name.trim() }),
+          ...(data.icon !== undefined && { icon: data.icon }),
+        })
+        .where(eq(schema.categories.id, id))
+        .run();
+
+      loadData();
+    },
+    [loadData]
+  );
+
+  const deleteCategory = useCallback(
+    async (
+      id: number
+    ): Promise<{ success: boolean; hasTransactions: boolean }> => {
+      ensureDatabaseInitialized();
+
+      // Check linked transactions count
+      const checkRow = expoDb.getFirstSync<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM transactions WHERE category_id = ?;`,
+        [id]
+      );
+      const hasTransactions = Boolean(checkRow && checkRow.count > 0);
+
+      // Delete category
+      db.delete(schema.categories).where(eq(schema.categories.id, id)).run();
+
+      loadData();
+      return { success: true, hasTransactions };
+    },
+    [loadData]
+  );
+
+  return (
+    <CategoriesContext.Provider
+      value={{
+        categories,
+        isLoading,
+        refreshCategories: loadData,
+        createCategory,
+        updateCategory,
+        deleteCategory,
+      }}
+    >
+      {children}
+    </CategoriesContext.Provider>
+  );
+}
+
+export function useCategories() {
+  const context = useContext(CategoriesContext);
+  if (!context) {
+    throw new Error("useCategories must be used within a CategoriesProvider");
+  }
+  return context;
+}

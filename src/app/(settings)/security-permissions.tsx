@@ -3,9 +3,10 @@ import { useRouter } from "expo-router";
 import React from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { HawkToggle } from "../components/HawkToggle";
-import { useSecurityGuard } from "../context/security";
-import { SecurityRuleKey } from "../db/schema";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { HawkToggle } from "../../components/HawkToggle";
+import { useSecurityGuard } from "../../context/security";
+import { SecurityRuleKey } from "../../db/schema";
 
 interface RuleItem {
   key: SecurityRuleKey;
@@ -70,20 +71,7 @@ export default function SecurityPermissionsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-dark-bg">
-      {/* Top Header */}
-      <View className="px-5 pt-3 pb-3 flex-row items-center justify-between border-b border-dark-border/30">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="w-10 h-10 rounded-full bg-dark-surface border border-dark-border items-center justify-center -ml-1"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={20} color="#F8FAFC" />
-        </TouchableOpacity>
-        <Text className="text-dark-text text-lg font-bold">
-          Security Checks
-        </Text>
-        <View className="w-10" />
-      </View>
+      <ScreenHeader title="Security Checks" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

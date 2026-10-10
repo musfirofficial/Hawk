@@ -1,15 +1,40 @@
+import * as NavigationBar from "expo-navigation-bar";
+import * as SystemUI from "expo-system-ui";
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect } from "react";
-import { View, ActivityIndicator } from "react-native";
+import { ActivityIndicator, Platform, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AccountsProvider } from "../context/accounts";
+import { AlertProvider } from "../context/alert";
 import { AuthProvider, useAuth } from "../context/auth";
+import { CategoriesProvider } from "../context/categories";
+import { ContactsProvider } from "../context/contacts";
+import { DebtsProvider } from "../context/debts";
 import { SecurityProvider } from "../context/security";
+import { TransactionsProvider } from "../context/transactions";
 import "../../global.css";
+
+// Ensure root view background color is Hawk's dark luxury background on Android & iOS
+if (Platform.OS === "android") {
+  try {
+    SystemUI.setBackgroundColorAsync("#0B0D12");
+  } catch (e) {}
+}
 
 function NavigationGate() {
   const { hasOnboarded, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  useEffect(() => {
+    // Set Android navigation bar style to "light" (meaning light icons on dark background)
+    if (Platform.OS === "android") {
+      try {
+        SystemUI.setBackgroundColorAsync("#0B0D12");
+        NavigationBar.setStyle("light");
+      } catch (e) {}
+    }
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;
@@ -34,37 +59,14 @@ function NavigationGate() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <>
+      {Platform.OS === "android" ? (
+        <NavigationBar.NavigationBar style="light" />
+      ) : null}
+      <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="settings"
-        options={{
-          headerShown: false,
-          presentation: "card",
-        }}
-      />
-      <Stack.Screen
-        name="change-pin"
-        options={{
-          headerShown: false,
-          presentation: "card",
-        }}
-      />
-      <Stack.Screen
-        name="security-permissions"
-        options={{
-          headerShown: false,
-          presentation: "card",
-        }}
-      />
-      <Stack.Screen
-        name="edit-profile"
-        options={{
-          headerShown: false,
-          presentation: "card",
-        }}
-      />
+      <Stack.Screen name="(settings)" options={{ headerShown: false }} />
       <Stack.Screen
         name="fulltransaction"
         options={{
@@ -72,7 +74,22 @@ function NavigationGate() {
           presentation: "card",
         }}
       />
+      <Stack.Screen
+        name="(categories)/categories"
+        options={{
+          headerShown: false,
+          presentation: "card",
+        }}
+      />
+      <Stack.Screen
+        name="(categories)/create-category"
+        options={{
+          headerShown: false,
+          presentation: "card",
+        }}
+      />
     </Stack>
+    </>
   );
 }
 
@@ -81,7 +98,19 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <SecurityProvider>
-          <NavigationGate />
+          <AccountsProvider>
+            <ContactsProvider>
+              <DebtsProvider>
+                <CategoriesProvider>
+                  <TransactionsProvider>
+                    <AlertProvider>
+                      <NavigationGate />
+                    </AlertProvider>
+                  </TransactionsProvider>
+                </CategoriesProvider>
+              </DebtsProvider>
+            </ContactsProvider>
+          </AccountsProvider>
         </SecurityProvider>
       </AuthProvider>
     </SafeAreaProvider>

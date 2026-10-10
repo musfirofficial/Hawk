@@ -1,13 +1,14 @@
 import { useRouter } from "expo-router";
 import React from "react";
-import { Alert } from "react-native";
-import { ProfileForm, ProfileFormData } from "../components/ProfileForm";
-import { useAuth } from "../context/auth";
-import { NumberFormatId } from "../db/schema";
+import { ProfileForm, ProfileFormData } from "../../components/ProfileForm";
+import { useAlert } from "../../context/alert";
+import { useAuth } from "../../context/auth";
+import { NumberFormatId } from "../../db/schema";
 
 export default function EditProfileScreen() {
   const router = useRouter();
   const { settings, completeOnboarding } = useAuth();
+  const { showAlert } = useAlert();
 
   async function handleSave(data: ProfileFormData) {
     try {
@@ -20,10 +21,18 @@ export default function EditProfileScreen() {
         biometricsEnabled: settings?.biometricsEnabled,
       });
 
-      Alert.alert("Success", "Profile updated successfully.");
-      router.back();
+      showAlert({
+        title: "Success",
+        message: "Profile updated successfully.",
+        type: "success",
+        onDismiss: () => router.back(),
+      });
     } catch (err: any) {
-      Alert.alert("Error", err?.message || "Could not save profile changes.");
+      showAlert({
+        title: "Error",
+        message: err?.message || "Could not save profile changes.",
+        type: "danger",
+      });
     }
   }
 

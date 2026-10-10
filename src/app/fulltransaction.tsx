@@ -1,45 +1,205 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import {
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { CreateTransaction } from "../components/transactions/CreateTransaction";
+import { EditTransaction } from "../components/transactions/EditTransaction";
+import { TransactionCard } from "../components/transactions/TransactionCard";
+import { useAccounts } from "../context/accounts";
+import {
+  TransactionItem,
+  useTransactions,
+} from "../context/transactions";
 
 export default function FullTransactionScreen() {
   const router = useRouter();
+  const { transactions } = useTransactions();
+  const { accounts } = useAccounts();
+
   const [selectedFilter, setSelectedFilter] = useState("ALL");
+  const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedTx, setSelectedTx] = useState<TransactionItem | null>(null);
+
+  // Filter transactions
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((t) => {
+      // Type filter
+      if (selectedFilter === "INCOME" && t.type !== "INCOME") return false;
+      if (selectedFilter === "EXPENSE" && t.type !== "EXPENSE") return false;
+      if (selectedFilter === "TRANSFER" && t.type !== "TRANSFER") return false;
+      if (
+        selectedFilter === "DEBTS" &&
+        !["LEND", "BORROW", "DEBT PAID", "DEBT RECEIVED"].includes(t.type)
+      ) {
+        return false;
+      }
+
+      // Asset filter
+      if (
+        selectedAssetId !== null &&
+        t.fromAssetId !== selectedAssetId &&
+        t.toAssetId !== selectedAssetId
+      ) {
+        return false;
+      }
+
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesNote = t.note?.toLowerCase().includes(q);
+        const matchesCategory = t.categoryName?.toLowerCase().includes(q);
+        const matchesContact = t.contactName?.toLowerCase().includes(q);
+        const matchesAmount = String(t.amount).includes(q);
+        if (!matchesNote && !matchesCategory && !matchesContact && !matchesAmount) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [transactions, selectedFilter, selectedAssetId, searchQuery]);
+
+  // Group by date
+  const groupedByDate = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000)
+      .toISOString()
+      .split("T")[0];
+
+    const groups: { [date: string]: TransactionItem[] } = {};
+    for (const t of filteredTransactions) {
+      if (!groups[t.date]) {
+        groups[t.date] = [];
+      }
+      groups[t.date].push(t);
+    }
+
+    return Object.entries(groups).map(([dateStr, items]) => {
+      let label = dateStr;
+      if (dateStr === today) label = "Today";
+      else if (dateStr === yesterday) label = "Yesterday";
+
+      return { label, dateStr, items };
+    });
+  }, [filteredTransactions]);
+
+  const selectedAccountName = useMemo(() => {
+    if (selectedAssetId === null) return "All Liquid Assets";
+    const found = accounts.find((a) => a.id === selectedAssetId);
+    return found ? found.name : "All Liquid Assets";
+  }, [accounts, selectedAssetId]);
 
   return (
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-dark-bg">
-      {/* Top Header matching reference */}
-      <View className="flex-row items-center justify-between px-5 py-4 border-b border-dark-border">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="w-10 h-10 rounded-full bg-dark-surface border border-dark-border items-center justify-center"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={20} color="#F8FAFC" />
-        </TouchableOpacity>
-        <Text className="text-dark-text text-lg font-bold">Transactions</Text>
-        <TouchableOpacity
-          className="w-10 h-10 rounded-full bg-dark-surface border border-dark-border items-center justify-center"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="search" size={18} color="#F8FAFC" />
-        </TouchableOpacity>
-      </View>
+      {/* Top Header */}
+      <ScreenHeader
+        title="Transactions"
+        rightElement={
+          <View className="flex-row items-center gap-2">
+            <TouchableOpacity
+              onPress={() => setShowSearch(!showSearch)}
+              className="w-10 h-10 rounded-full bg-dark-surface border border-dark-border items-center justify-center"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="search" size={18} color="#F8FAFC" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setIsCreateOpen(true)}
+              className="w-10 h-10 rounded-full bg-brand-accent items-center justify-center"
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={22} color="#0B0D12" />
+            </TouchableOpacity>
+          </View>
+        }
+      />
 
-      {/* Account Selector Pill Badge (from design) */}
-      <View className="items-center my-3">
-        <TouchableOpacity
-          className="bg-dark-surface border border-dark-border px-4 py-2 rounded-full flex-row items-center gap-2"
-          activeOpacity={0.7}
+      {/* Optional Search Bar */}
+      {showSearch && (
+        <View className="px-5 pt-3">
+          <View className="bg-dark-surface border border-dark-border rounded-2xl px-4 py-2.5 flex-row items-center gap-2">
+            <Ionicons name="search" size={18} color="#60677C" />
+            <TextInput
+              placeholder="Search by note, category, contact..."
+              placeholderTextColor="#60677C"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              className="flex-1 text-dark-text text-sm py-0"
+              autoFocus
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <Ionicons name="close-circle" size={18} color="#60677C" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      )}
+
+      {/* Account Selector Pill Badge */}
+      <View className="px-5 my-3">
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="flex-row gap-2"
         >
-          <View className="w-2.5 h-2.5 rounded-full bg-brand-accent" />
-          <Text className="text-dark-text text-xs font-bold">
-            All Liquid Assets
-          </Text>
-          <Ionicons name="chevron-down" size={14} color="#94A3B8" />
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setSelectedAssetId(null)}
+            className={`px-3.5 py-1.5 rounded-full border flex-row items-center gap-1.5 ${
+              selectedAssetId === null
+                ? "bg-dark-surface border-brand-accent"
+                : "bg-dark-surface/60 border-dark-border"
+            }`}
+          >
+            <View
+              className={`w-2 h-2 rounded-full ${
+                selectedAssetId === null ? "bg-brand-accent" : "bg-dark-muted"
+              }`}
+            />
+            <Text
+              className={`text-xs font-bold ${
+                selectedAssetId === null
+                  ? "text-brand-accent"
+                  : "text-dark-muted"
+              }`}
+            >
+              All Assets
+            </Text>
+          </TouchableOpacity>
+
+          {accounts.map((a) => (
+            <TouchableOpacity
+              key={a.id}
+              onPress={() => setSelectedAssetId(a.id)}
+              className={`px-3.5 py-1.5 rounded-full border flex-row items-center gap-1.5 ${
+                selectedAssetId === a.id
+                  ? "bg-dark-surface border-brand-accent"
+                  : "bg-dark-surface/60 border-dark-border"
+              }`}
+            >
+              <Text
+                className={`text-xs font-bold ${
+                  selectedAssetId === a.id
+                    ? "text-brand-accent"
+                    : "text-dark-text"
+                }`}
+              >
+                {a.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Transaction Type Filter Pills */}
@@ -78,161 +238,54 @@ export default function FullTransactionScreen() {
         contentContainerStyle={{ paddingBottom: 60 }}
         className="flex-1 px-5"
       >
-        {/* Date Group: Today */}
-        <View className="mb-4">
-          <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-2.5">
-            Today
-          </Text>
-          <View className="space-y-2.5 gap-2.5">
-            <View className="bg-dark-surface p-3.5 rounded-2xl border border-dark-border flex-row items-center justify-between">
-              <View className="flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-full bg-dark-card items-center justify-center border border-dark-border">
-                  <Ionicons name="arrow-down" size={18} color="#22C55E" />
-                </View>
-                <View>
-                  <Text className="text-dark-text font-bold text-sm">
-                    Eva Novak
-                  </Text>
-                  <Text className="text-dark-muted text-xs">Salary • Bank</Text>
-                </View>
-              </View>
-              <Text className="text-brand-income font-bold text-base">
-                +$5,710.20
-              </Text>
+        {groupedByDate.length === 0 ? (
+          <TouchableOpacity
+            onPress={() => setIsCreateOpen(true)}
+            activeOpacity={0.7}
+            className="bg-dark-surface border border-dashed border-dark-border p-8 rounded-2xl items-center justify-center mt-6"
+          >
+            <View className="w-12 h-12 rounded-full bg-dark-card border border-dark-border items-center justify-center mb-2.5">
+              <Ionicons name="receipt-outline" size={22} color="#F8FAFC" />
             </View>
-
-            <View className="bg-dark-surface p-3.5 rounded-2xl border border-dark-border flex-row items-center justify-between">
-              <View className="flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-full bg-dark-card items-center justify-center border border-dark-border">
-                  <Ionicons name="trending-up" size={18} color="#22C55E" />
-                </View>
-                <View>
-                  <Text className="text-dark-text font-bold text-sm">
-                    Binance
-                  </Text>
-                  <Text className="text-dark-muted text-xs">
-                    Crypto P2P • Bank
-                  </Text>
-                </View>
-              </View>
-              <Text className="text-brand-income font-bold text-base">
-                +$714.00
+            <Text className="text-dark-text font-bold text-sm">
+              No Transactions Found
+            </Text>
+            <Text className="text-dark-muted text-xs mt-1 text-center">
+              Tap + to record your first income, expense, or transfer
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          groupedByDate.map((group) => (
+            <View key={group.dateStr} className="mb-4">
+              <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-2.5">
+                {group.label}
               </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Date Group: Yesterday */}
-        <View className="mb-4">
-          <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-2.5">
-            Yesterday
-          </Text>
-          <View className="space-y-2.5 gap-2.5">
-            <View className="bg-dark-surface p-3.5 rounded-2xl border border-dark-border flex-row items-center justify-between">
-              <View className="flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-full bg-dark-card items-center justify-center border border-dark-border">
-                  <Ionicons name="repeat" size={18} color="#F59E0B" />
-                </View>
-                <View>
-                  <Text className="text-dark-text font-bold text-sm">
-                    Henrik Jansen
-                  </Text>
-                  <Text className="text-dark-muted text-xs">
-                    Debt Received • Cash
-                  </Text>
-                </View>
+              <View className="space-y-2.5 gap-2.5">
+                {group.items.map((tx) => (
+                  <TransactionCard
+                    key={tx.id}
+                    transaction={tx}
+                    onPress={() => setSelectedTx(tx)}
+                  />
+                ))}
               </View>
-              <Text className="text-brand-income font-bold text-base">
-                +$428.00
-              </Text>
             </View>
-
-            <View className="bg-dark-surface p-3.5 rounded-2xl border border-dark-border flex-row items-center justify-between">
-              <View className="flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-full bg-dark-card items-center justify-center border border-dark-border">
-                  <Ionicons name="film-outline" size={18} color="#F43F5E" />
-                </View>
-                <View>
-                  <Text className="text-dark-text font-bold text-sm">
-                    Multiplex Cinema
-                  </Text>
-                  <Text className="text-dark-muted text-xs">
-                    Entertainment • Bank
-                  </Text>
-                </View>
-              </View>
-              <Text className="text-brand-expense font-bold text-base">
-                -$124.55
-              </Text>
-            </View>
-
-            <View className="bg-dark-surface p-3.5 rounded-2xl border border-dark-border flex-row items-center justify-between">
-              <View className="flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-full bg-dark-card items-center justify-center border border-dark-border">
-                  <Ionicons name="shirt-outline" size={18} color="#F43F5E" />
-                </View>
-                <View>
-                  <Text className="text-dark-text font-bold text-sm">
-                    Nike Store
-                  </Text>
-                  <Text className="text-dark-muted text-xs">
-                    Shopping • Cash
-                  </Text>
-                </View>
-              </View>
-              <Text className="text-brand-expense font-bold text-base">
-                -$328.96
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Date Group: Earlier */}
-        <View className="mb-4">
-          <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-2.5">
-            19 November
-          </Text>
-          <View className="space-y-2.5 gap-2.5">
-            <View className="bg-dark-surface p-3.5 rounded-2xl border border-dark-border flex-row items-center justify-between">
-              <View className="flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-full bg-dark-card items-center justify-center border border-dark-border">
-                  <Ionicons name="arrow-down" size={18} color="#22C55E" />
-                </View>
-                <View>
-                  <Text className="text-dark-text font-bold text-sm">
-                    Matteo Ricci
-                  </Text>
-                  <Text className="text-dark-muted text-xs">
-                    Consulting • Bank
-                  </Text>
-                </View>
-              </View>
-              <Text className="text-brand-income font-bold text-base">
-                +$548.00
-              </Text>
-            </View>
-
-            <View className="bg-dark-surface p-3.5 rounded-2xl border border-dark-border flex-row items-center justify-between">
-              <View className="flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-full bg-dark-card items-center justify-center border border-dark-border">
-                  <Ionicons name="tv-outline" size={18} color="#F43F5E" />
-                </View>
-                <View>
-                  <Text className="text-dark-text font-bold text-sm">
-                    Megogo Subscription
-                  </Text>
-                  <Text className="text-dark-muted text-xs">
-                    Services • Bank
-                  </Text>
-                </View>
-              </View>
-              <Text className="text-brand-expense font-bold text-base">
-                -$847.20
-              </Text>
-            </View>
-          </View>
-        </View>
+          ))
+        )}
       </ScrollView>
+
+      {/* Create Transaction Modal */}
+      <CreateTransaction
+        visible={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
+
+      {/* Edit / View Transaction Modal */}
+      <EditTransaction
+        visible={Boolean(selectedTx)}
+        onClose={() => setSelectedTx(null)}
+        transaction={selectedTx}
+      />
     </SafeAreaView>
   );
 }

@@ -16,6 +16,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CurrencyPicker } from "./CurrencyPicker";
+import { ScreenHeader } from "./ScreenHeader";
+import { useAlert } from "../context/alert";
 import {
   NUMBER_FORMATS,
   NumberFormatId,
@@ -53,6 +55,7 @@ export function ProfileForm({
   headerTitle,
   submitButtonLabel,
 }: ProfileFormProps) {
+  const { showAlert } = useAlert();
   const [name, setName] = useState(initialData?.name || "");
   const [profilePic, setProfilePic] = useState<string | null>(
     initialData?.profilePic || null
@@ -83,10 +86,12 @@ export function ProfileForm({
         await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permission.granted) {
-        Alert.alert(
-          "Permission Required",
-          "Please grant media gallery permissions to set your profile picture."
-        );
+        showAlert({
+          title: "Permission Required",
+          message:
+            "Please grant media gallery permissions to set your profile picture.",
+          type: "warning",
+        });
         return;
       }
 
@@ -111,7 +116,11 @@ export function ProfileForm({
       }
     } catch (err) {
       console.warn("Failed to pick image:", err);
-      Alert.alert("Error", "Could not select image. Please try again.");
+      showAlert({
+        title: "Error",
+        message: "Could not select image. Please try again.",
+        type: "danger",
+      });
     }
   }
 
@@ -151,28 +160,13 @@ export function ProfileForm({
         className="flex-1"
       >
         {/* Top Bar */}
-        <View className="px-5 pt-2 pb-1 flex-row items-center justify-between">
-          {showBack ? (
-            <TouchableOpacity
-              onPress={onBack}
-              className="w-10 h-10 rounded-full items-center justify-center -ml-2"
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
-            </TouchableOpacity>
-          ) : (
-            <View className="w-10" />
-          )}
-
-          {headerTitle ? (
-            <Text className="text-dark-text text-lg font-bold">
-              {headerTitle}
-            </Text>
-          ) : (
-            <View className="w-10" />
-          )}
-          <View className="w-10" />
-        </View>
+        {headerTitle ? (
+          <ScreenHeader
+            title={headerTitle}
+            onBack={onBack}
+            showBack={showBack}
+          />
+        ) : null}
 
         <ScrollView
           showsVerticalScrollIndicator={false}
