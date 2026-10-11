@@ -23,7 +23,7 @@ export interface TransactionItem {
   categoryId: number | null;
   categoryName: string | null;
   categoryIcon: string | null;
-  categoryColor: string | null;
+  categoryColor?: string | null;
   contactId: number | null;
   contactName: string | null;
   debtId: number | null;
@@ -93,7 +93,6 @@ interface RawTransactionQueryRow {
   category_id: number | null;
   category_name: string | null;
   category_icon: string | null;
-  category_color: string | null;
   contact_id: number | null;
   contact_name: string | null;
   debt_id: number | null;
@@ -136,7 +135,6 @@ export function TransactionsProvider({
           t.category_id,
           cat.name AS category_name,
           cat.icon AS category_icon,
-          cat.color AS category_color,
           t.contact_id,
           c.name AS contact_name,
           t.debt_id,
@@ -164,7 +162,7 @@ export function TransactionsProvider({
         categoryId: row.category_id,
         categoryName: row.category_name,
         categoryIcon: row.category_icon,
-        categoryColor: row.category_color,
+        categoryColor: null,
         contactId: row.contact_id,
         contactName: row.contact_name,
         debtId: row.debt_id,

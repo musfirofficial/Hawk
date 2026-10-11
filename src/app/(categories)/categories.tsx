@@ -104,28 +104,15 @@ export default function CategoriesScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Right: Tool Buttons (Edit & Delete) */}
-        <View className="flex-row items-center gap-2">
-          {/* Edit Button */}
-          <TouchableOpacity
-            onPress={() => handleEditCategory(item)}
-            className="w-9 h-9 rounded-full bg-dark-card border border-dark-border items-center justify-center active:bg-dark-border/40"
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="pencil" size={15} color="#94A3B8" />
-          </TouchableOpacity>
-
-          {/* Delete Button */}
-          <TouchableOpacity
-            onPress={() => handleDeleteCategory(item)}
-            className="w-9 h-9 rounded-full bg-dark-card border border-dark-border items-center justify-center active:bg-rose-500/20"
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="trash-outline" size={15} color="#F43F5E" />
-          </TouchableOpacity>
-        </View>
+        {/* Right: Delete Button */}
+        <TouchableOpacity
+          onPress={() => handleDeleteCategory(item)}
+          className="w-9 h-9 rounded-full bg-dark-card border border-dark-border items-center justify-center active:bg-rose-500/20 mr-1"
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="trash-outline" size={15} color="#F43F5E" />
+        </TouchableOpacity>
       </View>
     );
   };

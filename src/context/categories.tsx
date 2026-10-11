@@ -109,17 +109,32 @@ export function CategoriesProvider({
     async (data: CreateCategoryInput): Promise<number> => {
       ensureDatabaseInitialized();
 
-      const inserted = db
-        .insert(schema.categories)
-        .values({
-          name: data.name.trim(),
-          icon: data.icon || "pricetag-outline",
-        })
-        .returning({ id: schema.categories.id })
-        .get();
+      try {
+        const inserted = db
+          .insert(schema.categories)
+          .values({
+            name: data.name.trim(),
+            icon: data.icon || "pricetag-outline",
+          })
+          .returning({ id: schema.categories.id })
+          .get();
 
-      loadData();
-      return inserted.id;
+        loadData();
+        return inserted.id;
+      } catch (err: any) {
+        if (String(err?.message || "").includes("NOT NULL")) {
+          expoDb.runSync(
+            `INSERT INTO categories (name, type, icon) VALUES (?, 'EXPENSE', ?);`,
+            [data.name.trim(), data.icon || "pricetag-outline"]
+          );
+          const row = expoDb.getFirstSync<{ id: number }>(
+            "SELECT last_insert_rowid() AS id;"
+          );
+          loadData();
+          return row?.id ?? 0;
+        }
+        throw err;
+      }
     },
     [loadData]
   );

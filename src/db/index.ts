@@ -28,9 +28,7 @@ export function ensureDatabaseInitialized() {
       CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         name TEXT NOT NULL,
-        type TEXT NOT NULL,
         icon TEXT,
-        color TEXT,
         created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
       );
       CREATE TABLE IF NOT EXISTS contacts (
@@ -121,6 +119,32 @@ export function ensureDatabaseInitialized() {
         "ALTER TABLE debts ADD COLUMN is_archived INTEGER DEFAULT 0 NOT NULL;"
       );
     } catch {}
+
+    // Migrate categories table if legacy 'type' column exists
+    try {
+      const catCols = expoDb.getAllSync<{ name: string }>(
+        "PRAGMA table_info(categories);"
+      );
+      const hasTypeCol = catCols.some((col) => col.name === "type");
+      if (hasTypeCol) {
+        expoDb.execSync(`
+          PRAGMA foreign_keys=OFF;
+          CREATE TABLE IF NOT EXISTS categories_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            name TEXT NOT NULL,
+            icon TEXT,
+            created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+          );
+          INSERT OR IGNORE INTO categories_new (id, name, icon, created_at)
+            SELECT id, name, icon, created_at FROM categories;
+          DROP TABLE categories;
+          ALTER TABLE categories_new RENAME TO categories;
+          PRAGMA foreign_keys=ON;
+        `);
+      }
+    } catch (err) {
+      console.warn("Categories migration warning:", err);
+    }
 
     // Ensure single-row security_rules record exists
     try {
