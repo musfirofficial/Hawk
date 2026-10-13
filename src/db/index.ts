@@ -28,6 +28,7 @@ export function ensureDatabaseInitialized() {
       CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         name TEXT NOT NULL,
+        type TEXT DEFAULT 'EXPENSE' NOT NULL,
         icon TEXT,
         created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
       );
@@ -124,30 +125,19 @@ export function ensureDatabaseInitialized() {
       );
     } catch {}
 
-    // Migrate categories table if legacy 'type' column exists
+    // Ensure categories table has 'type' column
     try {
       const catCols = expoDb.getAllSync<{ name: string }>(
         "PRAGMA table_info(categories);"
       );
       const hasTypeCol = catCols.some((col) => col.name === "type");
-      if (hasTypeCol) {
-        expoDb.execSync(`
-          PRAGMA foreign_keys=OFF;
-          CREATE TABLE IF NOT EXISTS categories_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            name TEXT NOT NULL,
-            icon TEXT,
-            created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
-          );
-          INSERT OR IGNORE INTO categories_new (id, name, icon, created_at)
-            SELECT id, name, icon, created_at FROM categories;
-          DROP TABLE categories;
-          ALTER TABLE categories_new RENAME TO categories;
-          PRAGMA foreign_keys=ON;
-        `);
+      if (!hasTypeCol) {
+        expoDb.execSync(
+          "ALTER TABLE categories ADD COLUMN type TEXT DEFAULT 'EXPENSE' NOT NULL;"
+        );
       }
     } catch (err) {
-      console.warn("Categories migration warning:", err);
+      console.warn("Categories type column migration warning:", err);
     }
 
     // Ensure single-row security_rules record exists
@@ -161,22 +151,28 @@ export function ensureDatabaseInitialized() {
       `);
     } catch {}
 
-    // Seed default categories
+    // Seed default categories with INCOME and EXPENSE types
     try {
       expoDb.execSync(`
-        INSERT OR IGNORE INTO categories (id, name, icon) VALUES
-        (1, 'Salary', 'cash-outline'),
-        (2, 'Freelance', 'laptop-outline'),
-        (3, 'Investments', 'trending-up-outline'),
-        (4, 'Gift / Allowance', 'gift-outline'),
-        (5, 'Food & Groceries', 'fast-food-outline'),
-        (6, 'Shopping', 'cart-outline'),
-        (7, 'Housing & Rent', 'home-outline'),
-        (8, 'Transportation', 'car-outline'),
-        (9, 'Utilities & Bills', 'flash-outline'),
-        (10, 'Entertainment', 'film-outline'),
-        (11, 'Healthcare', 'medkit-outline'),
-        (12, 'General', 'receipt-outline');
+        INSERT OR IGNORE INTO categories (id, name, type, icon) VALUES
+        (1, 'Salary', 'INCOME', 'cash-outline'),
+        (2, 'Freelance', 'INCOME', 'laptop-outline'),
+        (3, 'Investments', 'INCOME', 'trending-up-outline'),
+        (4, 'Gift / Allowance', 'INCOME', 'gift-outline'),
+        (5, 'Business', 'INCOME', 'briefcase-outline'),
+        (6, 'Other Income', 'INCOME', 'wallet-outline'),
+        (7, 'Food & Groceries', 'EXPENSE', 'fast-food-outline'),
+        (8, 'Shopping', 'EXPENSE', 'cart-outline'),
+        (9, 'Housing & Rent', 'EXPENSE', 'home-outline'),
+        (10, 'Transportation', 'EXPENSE', 'car-outline'),
+        (11, 'Utilities & Bills', 'EXPENSE', 'flash-outline'),
+        (12, 'Entertainment', 'EXPENSE', 'film-outline'),
+        (13, 'Healthcare', 'EXPENSE', 'medkit-outline'),
+        (14, 'Education', 'EXPENSE', 'book-outline'),
+        (15, 'Personal Care', 'EXPENSE', 'sparkles-outline'),
+        (16, 'General Expense', 'EXPENSE', 'receipt-outline');
+
+        UPDATE categories SET type = 'INCOME' WHERE name IN ('Salary', 'Freelance', 'Investments', 'Gift / Allowance', 'Business', 'Other Income');
       `);
     } catch {}
 

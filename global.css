@@ -3,20 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --background: #0B0D12;
+  --background: #0b0d12;
   --surface: #141720;
-  --card: #1B1F2B;
-  --border: #262B3A;
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-muted: #60677C;
-  --accent: #D4F938;
-  --income: #22C55E;
-  --expense: #F43F5E;
+  --card: #1b1f2b;
+  --border: #262b3a;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #60677c;
+  --accent: #adadad;
+  --income: #22c55e;
+  --expense: #f43f5e;
 }
 
-body {
-  background-color: #0B0D12;
-  color: #F8FAFC;
-  font-family: 'DMSans_400Regular', sans-serif;
+body,
+text,
+input {
+  background-color: #0b0d12;
+  color: #f8fafc;
+  font-family: "DMSans_400Regular", sans-serif;
 }

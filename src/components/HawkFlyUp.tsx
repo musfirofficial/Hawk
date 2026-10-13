@@ -174,7 +174,7 @@ export function HawkFlyUp({
 
         {/* Optional Sheet Header */}
         {(title || showCloseButton) ? (
-          <View className="flex-row items-center justify-between pb-3 mb-3 border-b border-dark-border/40">
+          <View className="flex-row items-center justify-between pb-4 mb-4 border-b border-dark-border/50">
             <View className="flex-1 mr-2">
               {title ? (
                 <Text className="text-dark-text text-lg font-bold">
@@ -182,7 +182,7 @@ export function HawkFlyUp({
                 </Text>
               ) : null}
               {subtitle ? (
-                <Text className="text-dark-muted text-xs mt-0.5">
+                <Text className="text-dark-muted text-xs mt-0.5 font-medium">
                   {subtitle}
                 </Text>
               ) : null}

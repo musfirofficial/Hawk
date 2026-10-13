@@ -9,6 +9,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { HawkFlyUp } from "./HawkFlyUp";
 
+// Universal height for calendar grid content (matches a 5-week month)
+const CALENDAR_BODY_HEIGHT = 256;
+
 // --- Date Helpers (Timezone-safe) ---
 
 export function parseYMD(dateStr?: string): { year: number; month: number; day: number } {
@@ -53,6 +56,26 @@ export function formatDisplayDate(dateStr?: string): string {
   return `${day} ${monthNames[month]} ${year}`;
 }
 
+export function formatDisplayMonth(dateStr?: string): string {
+  if (!dateStr) return "";
+  const { year, month } = parseYMD(dateStr);
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  return `${monthNames[month]} ${year}`;
+}
+
 const MONTH_NAMES = [
   "January",
   "February",
@@ -68,6 +91,28 @@ const MONTH_NAMES = [
   "December",
 ];
 
+const MONTH_SHORT_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const QUARTERS = [
+  [0, 1, 2], // Q1: Jan, Feb, Mar
+  [3, 4, 5], // Q2: Apr, May, Jun
+  [6, 7, 8], // Q3: Jul, Aug, Sep
+  [9, 10, 11], // Q4: Oct, Nov, Dec
+];
+
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export interface CalendarDayItem {
@@ -80,6 +125,8 @@ export interface CalendarDayItem {
   isSelected: boolean;
   isDisabled: boolean;
 }
+
+export type CalendarMode = "full" | "month-only";
 
 export interface CalendarProps {
   /** Selected date in "YYYY-MM-DD" format */
@@ -96,6 +143,8 @@ export interface CalendarProps {
   className?: string;
   /** Whether to show the top Today button */
   showTodayButton?: boolean;
+  /** Developer capability: 'full' allows day & month picking; 'month-only' locks to months & year */
+  mode?: CalendarMode;
 }
 
 export function Calendar({
@@ -106,12 +155,23 @@ export function Calendar({
   style,
   className = "",
   showTodayButton = true,
+  mode = "full",
 }: CalendarProps) {
   const todayYMD = useMemo(() => getTodayYMD(), []);
   const initial = useMemo(() => parseYMD(value || todayYMD), [value, todayYMD]);
 
   const [viewYear, setViewYear] = useState<number>(initial.year);
   const [viewMonth, setViewMonth] = useState<number>(initial.month);
+  const [viewType, setViewType] = useState<"day" | "month">(
+    mode === "month-only" ? "month" : "day"
+  );
+
+  // Lock to month view if mode is month-only
+  useEffect(() => {
+    if (mode === "month-only") {
+      setViewType("month");
+    }
+  }, [mode]);
 
   // Sync view month/year if value changes externally
   useEffect(() => {
@@ -122,6 +182,7 @@ export function Calendar({
     }
   }, [value]);
 
+  // Day view month navigation limits
   const canGoNextMonth = useMemo(() => {
     if (!maxDate) return true;
     const nextM = viewMonth === 11 ? 0 : viewMonth + 1;
@@ -130,7 +191,17 @@ export function Calendar({
     return firstDayOfNextMonth <= maxDate;
   }, [maxDate, viewMonth, viewYear]);
 
+  const canGoPrevMonth = useMemo(() => {
+    if (!minDate) return true;
+    const prevM = viewMonth === 0 ? 11 : viewMonth - 1;
+    const prevY = viewMonth === 0 ? viewYear - 1 : viewYear;
+    const daysInPrev = new Date(prevY, prevM + 1, 0).getDate();
+    const lastDayOfPrevMonth = formatYMD(prevY, prevM, daysInPrev);
+    return lastDayOfPrevMonth >= minDate;
+  }, [minDate, viewMonth, viewYear]);
+
   const handlePrevMonth = () => {
+    if (!canGoPrevMonth) return;
     if (viewMonth === 0) {
       setViewYear((prev) => prev - 1);
       setViewMonth(11);
@@ -149,6 +220,29 @@ export function Calendar({
     }
   };
 
+  // Month view year navigation limits
+  const canGoNextYear = useMemo(() => {
+    if (!maxDate) return true;
+    const firstDayOfNextYear = formatYMD(viewYear + 1, 0, 1);
+    return firstDayOfNextYear <= maxDate;
+  }, [maxDate, viewYear]);
+
+  const canGoPrevYear = useMemo(() => {
+    if (!minDate) return true;
+    const lastDayOfPrevYear = formatYMD(viewYear - 1, 11, 31);
+    return lastDayOfPrevYear >= minDate;
+  }, [minDate, viewYear]);
+
+  const handlePrevYear = () => {
+    if (!canGoPrevYear) return;
+    setViewYear((prev) => prev - 1);
+  };
+
+  const handleNextYear = () => {
+    if (!canGoNextYear) return;
+    setViewYear((prev) => prev + 1);
+  };
+
   const handleTodayPress = () => {
     const today = parseYMD(todayYMD);
     setViewYear(today.year);
@@ -158,19 +252,29 @@ export function Calendar({
 
   const handleSelectDay = (day: CalendarDayItem) => {
     if (day.isDisabled) return;
-    if (maxDate && day.dateString > maxDate) return;
-
-    if (day.isPrevMonth) {
-      handlePrevMonth();
-    } else if (day.isNextMonth) {
-      handleNextMonth();
-    }
-
     onChange?.(day.dateString);
   };
 
-  // Generate grid days
+  const handleMonthSelect = (monthIdx: number) => {
+    setViewMonth(monthIdx);
+    if (mode === "month-only") {
+      const newDate = formatYMD(viewYear, monthIdx, 1);
+      onChange?.(newDate);
+    } else {
+      // In full mode, drill down to Day view with selected month
+      const parsedVal = parseYMD(value || todayYMD);
+      const daysInTargetMonth = new Date(viewYear, monthIdx + 1, 0).getDate();
+      const clampedDay = Math.min(parsedVal.day || 1, daysInTargetMonth);
+      const newDate = formatYMD(viewYear, monthIdx, clampedDay);
+      onChange?.(newDate);
+      setViewType("day");
+    }
+  };
+
+  // Generate grid days for day view
   const calendarDays = useMemo<CalendarDayItem[]>(() => {
+    if (viewType !== "day") return [];
+
     const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
     const daysInCurrentMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
     const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
@@ -244,119 +348,289 @@ export function Calendar({
     }
 
     return days;
-  }, [viewYear, viewMonth, minDate, maxDate, todayYMD, value]);
+  }, [viewType, viewYear, viewMonth, minDate, maxDate, todayYMD, value]);
+
+  // Group days into weeks of 7 items
+  const weeks = useMemo(() => {
+    const result: CalendarDayItem[][] = [];
+    for (let i = 0; i < calendarDays.length; i += 7) {
+      result.push(calendarDays.slice(i, i + 7));
+    }
+    return result;
+  }, [calendarDays]);
 
   return (
     <View
       style={style}
       className={`bg-dark-surface border border-dark-border rounded-3xl p-4 ${className}`}
     >
-      {/* Header Row */}
-      <View className="flex-row items-center justify-between mb-4 px-1">
-        {/* Left: Today button */}
-        {showTodayButton ? (
-          <TouchableOpacity
-            onPress={handleTodayPress}
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            className="py-1 px-2.5 rounded-xl bg-dark-card border border-dark-border/60"
-          >
-            <Text className="text-dark-textSecondary text-xs font-semibold tracking-wide">
-              Today
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 44 }} />
-        )}
-
-        {/* Center: Month & Year */}
-        <Text className="text-dark-text text-base font-bold tracking-tight">
-          {MONTH_NAMES[viewMonth]} {viewYear}
-        </Text>
-
-        {/* Right: Chevrons */}
-        <View className="flex-row items-center gap-1.5">
-          <TouchableOpacity
-            onPress={handlePrevMonth}
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            className="w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border"
-          >
-            <Ionicons name="chevron-back" size={16} color="#94A3B8" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleNextMonth}
-            disabled={!canGoNextMonth}
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            className={`w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border ${
-              !canGoNextMonth ? "opacity-30" : ""
-            }`}
-          >
-            <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Weekday Names */}
-      <View className="flex-row items-center justify-between mb-2">
-        {WEEK_DAYS.map((day) => (
-          <View key={day} className="w-[14.28%] items-center justify-center py-1">
-            <Text className="text-dark-muted text-xs font-semibold uppercase tracking-wider">
-              {day}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Date Grid */}
-      <View className="flex-row flex-wrap">
-        {calendarDays.map((item) => {
-          return (
-            <View
-              key={item.dateString}
-              className="w-[14.28%] aspect-square items-center justify-center py-0.5"
-            >
+      {viewType === "month" ? (
+        /* --- MONTH PICKER VIEW --- */
+        <View>
+          {/* Month View Header (fixed min-height to match Day View header) */}
+          <View className="flex-row items-center justify-between mb-3 px-1 min-h-[38px]">
+            {/* Left: If full mode, back arrow to day view. If month-only, 'This Month' jump button */}
+            {mode === "full" ? (
               <TouchableOpacity
-                onPress={() => handleSelectDay(item)}
-                disabled={item.isDisabled}
+                onPress={() => setViewType("day")}
                 activeOpacity={0.7}
-                style={
-                  item.isSelected
-                    ? { backgroundColor: "#D4F938" }
-                    : undefined
-                }
-                className={`w-9 h-9 rounded-full items-center justify-center ${
-                  item.isSelected
-                    ? ""
-                    : item.isToday
-                    ? "border border-brand-accent/50 bg-brand-accent/10"
-                    : ""
-                }`}
+                className="w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text
-                  style={
-                    item.isSelected
-                      ? { color: "#0B0D12" }
-                      : undefined
-                  }
-                  className={`text-sm ${
-                    item.isSelected
-                      ? "font-extrabold"
-                      : item.isToday
-                      ? "font-bold text-brand-accent"
-                      : item.isCurrentMonth
-                      ? "font-semibold text-dark-text"
-                      : "font-normal text-[#475569]"
-                  } ${item.isDisabled ? "opacity-30" : ""}`}
-                >
-                  {item.dayNumber}
+                <Ionicons name="arrow-back" size={16} color="#F8FAFC" />
+              </TouchableOpacity>
+            ) : showTodayButton ? (
+              <TouchableOpacity
+                onPress={() => {
+                  const now = parseYMD(todayYMD);
+                  setViewYear(now.year);
+                  setViewMonth(now.month);
+                  onChange?.(formatYMD(now.year, now.month, 1));
+                }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className="py-1 px-2.5 rounded-xl bg-dark-card border border-dark-border/60"
+              >
+                <Text className="text-dark-textSecondary text-xs font-semibold tracking-wide">
+                  This Month
                 </Text>
               </TouchableOpacity>
+            ) : (
+              <View style={{ width: 32 }} />
+            )}
+
+            {/* Center: Year with Previous/Next Chevrons */}
+            <View className="flex-row items-center gap-2">
+              <TouchableOpacity
+                onPress={handlePrevYear}
+                disabled={!canGoPrevYear}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className={`w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border ${
+                  !canGoPrevYear ? "opacity-30" : ""
+                }`}
+              >
+                <Ionicons name="chevron-back" size={16} color="#94A3B8" />
+              </TouchableOpacity>
+
+              <Text className="text-dark-text text-base font-bold tracking-tight px-1.5">
+                {viewYear}
+              </Text>
+
+              <TouchableOpacity
+                onPress={handleNextYear}
+                disabled={!canGoNextYear}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className={`w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border ${
+                  !canGoNextYear ? "opacity-30" : ""
+                }`}
+              >
+                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+              </TouchableOpacity>
             </View>
-          );
-        })}
-      </View>
+
+            {/* Right: Symmetrical placeholder */}
+            <View style={{ width: mode === "full" ? 32 : 44 }} />
+          </View>
+
+          {/* 12 Months Grid: Proper Aesthetic Circles across 4 Quarters with Universal Height */}
+          <View style={{ height: CALENDAR_BODY_HEIGHT }} className="justify-between py-1">
+            {QUARTERS.map((quarter, qIdx) => (
+              <View
+                key={qIdx}
+                className="flex-row items-center justify-around flex-1"
+              >
+                {quarter.map((mIdx) => {
+                  const mName = MONTH_SHORT_NAMES[mIdx];
+                  const parsedVal = parseYMD(value || todayYMD);
+                  const isSelected =
+                    parsedVal.month === mIdx && parsedVal.year === viewYear;
+                  const todayObj = parseYMD(todayYMD);
+                  const isCurrentMonth =
+                    todayObj.month === mIdx && todayObj.year === viewYear;
+
+                  const firstDayOfM = formatYMD(viewYear, mIdx, 1);
+                  const lastDayOfM = formatYMD(
+                    viewYear,
+                    mIdx,
+                    new Date(viewYear, mIdx + 1, 0).getDate()
+                  );
+                  const isDisabled =
+                    Boolean(minDate && lastDayOfM < minDate) ||
+                    Boolean(maxDate && firstDayOfM > maxDate);
+
+                  return (
+                    <TouchableOpacity
+                      key={mName}
+                      disabled={isDisabled}
+                      onPress={() => handleMonthSelect(mIdx)}
+                      activeOpacity={0.7}
+                      style={[
+                        { width: 54, height: 54, borderRadius: 27 },
+                        isSelected
+                          ? { backgroundColor: "#D4F938" }
+                          : undefined,
+                      ]}
+                      className={`rounded-full items-center justify-center border shadow-sm ${
+                        isSelected
+                          ? "border-brand-accent"
+                          : isCurrentMonth
+                          ? "bg-dark-card border-brand-accent/60"
+                          : "bg-dark-card border-dark-border"
+                      } ${isDisabled ? "opacity-30" : ""}`}
+                    >
+                      <Text
+                        style={isSelected ? { color: "#0B0D12" } : undefined}
+                        className={`text-sm ${
+                          isSelected
+                            ? "font-extrabold"
+                            : isCurrentMonth
+                            ? "font-bold text-brand-accent"
+                            : "font-semibold text-dark-text"
+                        }`}
+                      >
+                        {mName}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : (
+        /* --- DAY VIEW --- */
+        <View>
+          {/* Day View Header Row (fixed min-height matching Month View header) */}
+          <View className="flex-row items-center justify-between mb-3 px-1 min-h-[38px]">
+            {/* Left: Today button */}
+            {showTodayButton ? (
+              <TouchableOpacity
+                onPress={handleTodayPress}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className="py-1 px-2.5 rounded-xl bg-dark-card border border-dark-border/60"
+              >
+                <Text className="text-dark-textSecondary text-xs font-semibold tracking-wide">
+                  Today
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 44 }} />
+            )}
+
+            {/* Center: Month & Year (Tap to switch to Month Picker) */}
+            <TouchableOpacity
+              onPress={() => setViewType("month")}
+              activeOpacity={0.7}
+              className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-xl bg-dark-card border border-dark-border/60"
+            >
+              <Text className="text-dark-text text-base font-bold tracking-tight">
+                {MONTH_NAMES[viewMonth]} {viewYear}
+              </Text>
+              <Ionicons name="chevron-down" size={13} color="#94A3B8" />
+            </TouchableOpacity>
+
+            {/* Right: Chevrons */}
+            <View className="flex-row items-center gap-1.5">
+              <TouchableOpacity
+                onPress={handlePrevMonth}
+                disabled={!canGoPrevMonth}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className={`w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border ${
+                  !canGoPrevMonth ? "opacity-30" : ""
+                }`}
+              >
+                <Ionicons name="chevron-back" size={16} color="#94A3B8" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleNextMonth}
+                disabled={!canGoNextMonth}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className={`w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border ${
+                  !canGoNextMonth ? "opacity-30" : ""
+                }`}
+              >
+                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Universal Height Day Grid Container */}
+          <View style={{ height: CALENDAR_BODY_HEIGHT }} className="justify-between">
+            {/* Weekday Names */}
+            <View className="flex-row items-center justify-between h-6 mb-1">
+              {WEEK_DAYS.map((day) => (
+                <View key={day} className="w-[14.28%] items-center justify-center">
+                  <Text className="text-dark-muted text-xs font-semibold uppercase tracking-wider">
+                    {day}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Weeks Container (Distributes evenly to guarantee identical 5-week height) */}
+            <View className="flex-1 justify-between">
+              {weeks.map((week, weekIdx) => (
+                <View
+                  key={weekIdx}
+                  className="flex-row items-center justify-between flex-1"
+                >
+                  {week.map((item) => {
+                    return (
+                      <View
+                        key={item.dateString}
+                        className="w-[14.28%] items-center justify-center"
+                      >
+                        <TouchableOpacity
+                          onPress={() => handleSelectDay(item)}
+                          disabled={item.isDisabled}
+                          activeOpacity={0.7}
+                          style={[
+                            { width: 36, height: 36, borderRadius: 18 },
+                            item.isSelected
+                              ? { backgroundColor: "#D4F938" }
+                              : undefined,
+                          ]}
+                          className={`items-center justify-center ${
+                            item.isSelected
+                              ? ""
+                              : item.isToday
+                              ? "border border-brand-accent/50 bg-brand-accent/10"
+                              : ""
+                          }`}
+                        >
+                          <Text
+                            style={
+                              item.isSelected
+                                ? { color: "#0B0D12" }
+                                : undefined
+                            }
+                            className={`text-sm ${
+                              item.isSelected
+                                ? "font-extrabold"
+                                : item.isToday
+                                ? "font-bold text-brand-accent"
+                                : item.isCurrentMonth
+                                ? "font-semibold text-dark-text"
+                                : "font-normal text-[#475569]"
+                            } ${item.isDisabled ? "opacity-30" : ""}`}
+                          >
+                            {item.dayNumber}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -371,6 +645,8 @@ export interface CalendarModalProps {
   title?: string;
   minDate?: string;
   maxDate?: string;
+  /** Developer capability: 'full' allows day & month picking; 'month-only' locks to months & year */
+  mode?: CalendarMode;
 }
 
 export function CalendarModal({
@@ -381,6 +657,7 @@ export function CalendarModal({
   title = "Select Date",
   minDate,
   maxDate,
+  mode = "full",
 }: CalendarModalProps) {
   const [selectedDate, setSelectedDate] = useState<string>(
     value || getTodayYMD()
@@ -399,14 +676,20 @@ export function CalendarModal({
     onClose();
   };
 
+  const doneLabel =
+    mode === "month-only"
+      ? `Done (${formatDisplayMonth(selectedDate)})`
+      : `Done (${formatDisplayDate(selectedDate)})`;
+
   return (
     <HawkFlyUp visible={visible} onClose={onClose} title={title}>
-      {/* Embedded Calendar */}
+      {/* Embedded Calendar with universal height */}
       <Calendar
         value={selectedDate}
         onChange={(d) => setSelectedDate(d)}
         minDate={minDate}
         maxDate={maxDate}
+        mode={mode}
         className="mb-4"
       />
 
@@ -414,10 +697,10 @@ export function CalendarModal({
       <TouchableOpacity
         onPress={handleConfirm}
         activeOpacity={0.8}
-        className="bg-brand-accent py-3.5 rounded-2xl items-center justify-center"
+        className="bg-brand-accent py-3.5 rounded-2xl items-center justify-center shadow-lg active:opacity-90"
       >
         <Text className="text-dark-bg text-base font-bold">
-          Done ({formatDisplayDate(selectedDate)})
+          {doneLabel}
         </Text>
       </TouchableOpacity>
     </HawkFlyUp>

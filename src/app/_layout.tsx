@@ -34,6 +34,31 @@ if (Platform.OS === "android") {
   } catch (e) {}
 }
 
+// Enforce DM Sans font family globally so device/system fonts are never visible
+// @ts-ignore
+if (Text.defaultProps == null) {
+  // @ts-ignore
+  Text.defaultProps = {};
+}
+// @ts-ignore
+Text.defaultProps.style = [
+  { fontFamily: "DMSans_400Regular" },
+  // @ts-ignore
+  Text.defaultProps.style,
+];
+
+// @ts-ignore
+if (TextInput.defaultProps == null) {
+  // @ts-ignore
+  TextInput.defaultProps = {};
+}
+// @ts-ignore
+TextInput.defaultProps.style = [
+  { fontFamily: "DMSans_400Regular" },
+  // @ts-ignore
+  TextInput.defaultProps.style,
+];
+
 function NavigationGate() {
   const { hasOnboarded, isLoading } = useAuth();
   const segments = useSegments();

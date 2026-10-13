@@ -45,7 +45,19 @@ module.exports = {
   plugins: [
     ({ addUtilities }) => {
       addUtilities({
+        ".font-sans": {
+          fontFamily: "DMSans_400Regular",
+        },
+        ".font-regular": {
+          fontFamily: "DMSans_400Regular",
+        },
         ".font-normal": {
+          fontFamily: "DMSans_400Regular",
+        },
+        ".font-light": {
+          fontFamily: "DMSans_400Regular",
+        },
+        ".font-thin": {
           fontFamily: "DMSans_400Regular",
         },
         ".font-medium": {

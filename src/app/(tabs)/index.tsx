@@ -295,7 +295,7 @@ export default function HomeScreen() {
               <Text className="text-dark-text font-bold text-sm">
                 No Transactions Yet
               </Text>
-              <Text className="text-dark-muted text-xs mt-1 text-center">
+              <Text className="text-dark-muted text-xs mt-1 text-center font-medium">
                 Tap Expense, Transfer, or Income above to record your first
                 entry
               </Text>

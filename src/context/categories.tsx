@@ -8,22 +8,26 @@ import React, {
   useState,
 } from "react";
 import { db, ensureDatabaseInitialized, expoDb } from "../db";
+import { CategoryType } from "../db/schema";
 import * as schema from "../db/schema";
 
 export interface CategoryItem {
   id: number;
   name: string;
+  type: CategoryType;
   icon: string | null;
   transactionCount: number;
 }
 
 export interface CreateCategoryInput {
   name: string;
+  type: CategoryType;
   icon?: string | null;
 }
 
 export interface UpdateCategoryInput {
   name?: string;
+  type?: CategoryType;
   icon?: string | null;
 }
 
@@ -45,6 +49,7 @@ const CategoriesContext = createContext<CategoriesContextType | undefined>(
 interface RawCategoryQueryRow {
   id: number;
   name: string;
+  type: string;
   icon: string | null;
   transaction_count: number;
 }
@@ -65,6 +70,7 @@ export function CategoriesProvider({
         SELECT 
           c.id,
           c.name,
+          c.type,
           c.icon,
           COUNT(t.id) AS transaction_count
         FROM categories c
@@ -76,6 +82,7 @@ export function CategoriesProvider({
       const mapped: CategoryItem[] = rows.map((r) => ({
         id: r.id,
         name: r.name,
+        type: (r.type as CategoryType) || "EXPENSE",
         icon: r.icon,
         transactionCount: Number(r.transaction_count) || 0,
       }));
@@ -114,6 +121,7 @@ export function CategoriesProvider({
           .insert(schema.categories)
           .values({
             name: data.name.trim(),
+            type: data.type || "EXPENSE",
             icon: data.icon || "pricetag-outline",
           })
           .returning({ id: schema.categories.id })
@@ -122,10 +130,10 @@ export function CategoriesProvider({
         loadData();
         return inserted.id;
       } catch (err: any) {
-        if (String(err?.message || "").includes("NOT NULL")) {
+        if (String(err?.message || "").includes("NOT NULL") || String(err?.message || "").includes("no column named type")) {
           expoDb.runSync(
-            `INSERT INTO categories (name, type, icon) VALUES (?, 'EXPENSE', ?);`,
-            [data.name.trim(), data.icon || "pricetag-outline"]
+            `INSERT INTO categories (name, type, icon) VALUES (?, ?, ?);`,
+            [data.name.trim(), data.type || "EXPENSE", data.icon || "pricetag-outline"]
           );
           const row = expoDb.getFirstSync<{ id: number }>(
             "SELECT last_insert_rowid() AS id;"
@@ -146,6 +154,7 @@ export function CategoriesProvider({
       db.update(schema.categories)
         .set({
           ...(data.name !== undefined && { name: data.name.trim() }),
+          ...(data.type !== undefined && { type: data.type }),
           ...(data.icon !== undefined && { icon: data.icon }),
         })
         .where(eq(schema.categories.id, id))

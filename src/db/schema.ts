@@ -118,6 +118,7 @@ export const contacts = sqliteTable("contacts", {
 export const categories = sqliteTable("categories", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(), // e.g. Food, Salary, Rent
+  type: text("type", { enum: CATEGORY_TYPES }).default("EXPENSE").notNull(),
   icon: text("icon"), // icon name (not unique)
   createdAt: text("created_at")
     .default(sql`(CURRENT_TIMESTAMP)`)

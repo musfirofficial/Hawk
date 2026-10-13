@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,9 +11,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Dropdown } from "../../components/Dropdown";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { useAlert } from "../../context/alert";
 import { useCategories } from "../../context/categories";
+import { CategoryType } from "../../db/schema";
 
 // Curated icons tailored for Hawk financial tracker & transactions
 const CATEGORY_ICONS: (keyof typeof Ionicons.glyphMap)[] = [
@@ -56,7 +58,10 @@ const CATEGORY_ICONS: (keyof typeof Ionicons.glyphMap)[] = [
 
 export default function CreateCategoryScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    defaultType?: CategoryType;
+  }>();
   const categoryId = params.id ? parseInt(params.id, 10) : null;
 
   const { categories, createCategory, updateCategory } = useCategories();
@@ -68,16 +73,22 @@ export default function CreateCategoryScreen() {
 
   const isEditing = Boolean(existingCategory);
 
-  const [name, setName] = useState(existingCategory ? existingCategory.name : "");
-  const [selectedIcon, setSelectedIcon] = useState<keyof typeof Ionicons.glyphMap>(
-    (existingCategory?.icon as any) || "pricetag-outline"
+  const [name, setName] = useState(
+    existingCategory ? existingCategory.name : "",
   );
+  const [type, setType] = useState<CategoryType>(
+    existingCategory?.type || params.defaultType || "EXPENSE",
+  );
+  const [selectedIcon, setSelectedIcon] = useState<
+    keyof typeof Ionicons.glyphMap
+  >((existingCategory?.icon as any) || "pricetag-outline");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (existingCategory) {
       setName(existingCategory.name);
+      setType(existingCategory.type || "EXPENSE");
       if (existingCategory.icon) {
         setSelectedIcon(existingCategory.icon as any);
       }
@@ -98,6 +109,7 @@ export default function CreateCategoryScreen() {
       if (isEditing && existingCategory) {
         await updateCategory(existingCategory.id, {
           name: trimmed,
+          type,
           icon: selectedIcon,
         });
         showAlert({
@@ -109,6 +121,7 @@ export default function CreateCategoryScreen() {
       } else {
         await createCategory({
           name: trimmed,
+          type,
           icon: selectedIcon,
         });
         showAlert({
@@ -152,7 +165,7 @@ export default function CreateCategoryScreen() {
 
             <View
               style={{ borderColor: errorMsg ? "#F43F5E" : "#262B3A" }}
-              className="bg-dark-surface border rounded-2xl px-4 py-3.5 flex-row items-center gap-3"
+              className="bg-dark-surface border rounded-2xl px-4 h-16 flex-row items-center gap-3"
             >
               {/* Selected Icon preview on the left */}
               <View className="w-10 h-10 rounded-full bg-dark-card border border-dark-border items-center justify-center">
@@ -183,6 +196,22 @@ export default function CreateCategoryScreen() {
             ) : null}
           </View>
 
+          {/* Category Type Dropdown */}
+          <View className="mb-6">
+            <Dropdown<CategoryType>
+              label="Type"
+              labelClassName="text-dark-muted text-xs font-bold uppercase tracking-wider mb-2 ml-1"
+              triggerClassName="h-16"
+              options={[
+                { value: "EXPENSE", label: "Expense" },
+                { value: "INCOME", label: "Income" },
+              ]}
+              selectedValue={type}
+              onSelect={(val) => setType(val)}
+              monochrome={true}
+            />
+          </View>
+
           {/* Category Icon Grid - Arranged neatly with equal spacing */}
           <View className="mb-8">
             <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-3 ml-1">
@@ -193,7 +222,10 @@ export default function CreateCategoryScreen() {
               {CATEGORY_ICONS.map((iconName) => {
                 const isSelected = selectedIcon === iconName;
                 return (
-                  <View key={iconName} className="w-[18%] items-center justify-center">
+                  <View
+                    key={iconName}
+                    className="w-[18%] items-center justify-center"
+                  >
                     <TouchableOpacity
                       onPress={() => setSelectedIcon(iconName)}
                       activeOpacity={0.7}
@@ -219,19 +251,21 @@ export default function CreateCategoryScreen() {
               })}
             </View>
           </View>
+        </ScrollView>
 
-          {/* Submit Button */}
+        {/* Bottom Pinned Submit Button */}
+        <View className="px-5 py-4 border-t border-dark-border/40 bg-dark-bg">
           <TouchableOpacity
             onPress={handleSave}
             disabled={isSubmitting}
-            className="w-full py-4 rounded-2xl bg-brand-accent items-center justify-center shadow-lg active:opacity-90 mb-6"
+            className="w-full py-4 rounded-2xl bg-brand-accent items-center justify-center shadow-lg active:opacity-90"
             activeOpacity={0.8}
           >
             <Text className="text-dark-bg font-extrabold text-base tracking-wide">
               {isEditing ? "Save Changes" : "Create Category"}
             </Text>
           </TouchableOpacity>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

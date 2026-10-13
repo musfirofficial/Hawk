@@ -37,6 +37,7 @@ export interface TransactionItem {
 export interface CategoryItem {
   id: number;
   name: string;
+  type: CategoryType;
   icon: string | null;
 }
 
@@ -118,7 +119,7 @@ export function TransactionsProvider({
 
       // Query categories
       const catRows = expoDb.getAllSync<CategoryItem>(`
-        SELECT id, name, icon FROM categories ORDER BY name ASC;
+        SELECT id, name, type, icon FROM categories ORDER BY name ASC;
       `);
       setCategories(catRows);
 
@@ -270,8 +271,14 @@ export function TransactionsProvider({
     [loadData]
   );
 
-  const incomeCategories = categories;
-  const expenseCategories = categories;
+  const incomeCategories = useMemo(
+    () => categories.filter((c) => c.type === "INCOME"),
+    [categories]
+  );
+  const expenseCategories = useMemo(
+    () => categories.filter((c) => c.type === "EXPENSE"),
+    [categories]
+  );
 
   const todayNetChange = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];

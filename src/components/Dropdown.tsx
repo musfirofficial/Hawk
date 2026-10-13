@@ -10,20 +10,26 @@ export interface DropdownOption<T = string> {
 
 export interface DropdownProps<T = string> {
   label?: string;
+  labelClassName?: string;
   options: DropdownOption<T>[];
   selectedValue: T;
   onSelect: (value: T) => void;
   placeholder?: string;
   className?: string;
+  triggerClassName?: string;
+  monochrome?: boolean;
 }
 
 export function Dropdown<T extends string | number = string>({
   label,
+  labelClassName,
   options,
   selectedValue,
   onSelect,
   placeholder = "Select an option",
   className = "",
+  triggerClassName = "",
+  monochrome = false,
 }: DropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -32,23 +38,37 @@ export function Dropdown<T extends string | number = string>({
   return (
     <View className={className}>
       {label ? (
-        <Text className="text-dark-text text-sm font-semibold mb-2">
+        <Text
+          className={
+            labelClassName || "text-dark-text text-sm font-semibold mb-2"
+          }
+        >
           {label}
         </Text>
       ) : null}
 
       <TouchableOpacity
         onPress={() => setIsOpen(!isOpen)}
-        className={`bg-dark-surface border rounded-2xl px-4 py-3.5 flex-row items-center justify-between ${
-          isOpen ? "border-brand-accent/50" : "border-dark-border"
+        className={`bg-dark-surface border rounded-2xl px-4 flex-row items-center justify-between ${
+          triggerClassName || "py-3.5"
+        } ${
+          isOpen
+            ? monochrome
+              ? "border-dark-border bg-dark-surface"
+              : "border-brand-accent/50"
+            : "border-dark-border"
         }`}
         activeOpacity={0.8}
       >
         <View className="flex-row items-center gap-2.5">
           {selectedOption?.icon ? (
-            <Ionicons name={selectedOption.icon} size={18} color="#D4F938" />
+            <Ionicons
+              name={selectedOption.icon}
+              size={18}
+              color={monochrome ? "#F8FAFC" : "#D4F938"}
+            />
           ) : null}
-          <Text className="text-dark-text text-sm font-medium">
+          <Text className="text-dark-text text-sm font-semibold">
             {selectedOption?.label || placeholder}
           </Text>
         </View>
@@ -73,7 +93,13 @@ export function Dropdown<T extends string | number = string>({
                 }}
                 className={`px-4 py-3.5 flex-row items-center justify-between ${
                   idx > 0 ? "border-t border-dark-border/40" : ""
-                } ${isSelected ? "bg-brand-accent/5" : ""}`}
+                } ${
+                  isSelected
+                    ? monochrome
+                      ? "bg-dark-card"
+                      : "bg-brand-accent/5"
+                    : ""
+                }`}
                 activeOpacity={0.7}
               >
                 <View className="flex-row items-center gap-2.5">
@@ -81,14 +107,22 @@ export function Dropdown<T extends string | number = string>({
                     <Ionicons
                       name={opt.icon}
                       size={18}
-                      color={isSelected ? "#D4F938" : "#60677C"}
+                      color={
+                        isSelected
+                          ? monochrome
+                            ? "#F8FAFC"
+                            : "#D4F938"
+                          : "#60677C"
+                      }
                     />
                   ) : null}
                   <Text
-                    className={`text-sm font-medium ${
+                    className={`text-sm ${
                       isSelected
-                        ? "text-brand-accent font-semibold"
-                        : "text-dark-text"
+                        ? monochrome
+                          ? "text-dark-text font-bold"
+                          : "text-brand-accent font-semibold"
+                        : "text-dark-text font-medium"
                     }`}
                   >
                     {opt.label}
@@ -99,7 +133,7 @@ export function Dropdown<T extends string | number = string>({
                   <Ionicons
                     name="checkmark-circle"
                     size={18}
-                    color="#D4F938"
+                    color={monochrome ? "#F8FAFC" : "#D4F938"}
                   />
                 ) : null}
               </TouchableOpacity>

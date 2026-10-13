@@ -16,24 +16,32 @@ import { ScreenHeader } from "../../components/ScreenHeader";
 import { SearchBar } from "../../components/SearchBar";
 import { useAlert } from "../../context/alert";
 import { CategoryItem, useCategories } from "../../context/categories";
+import { CategoryType } from "../../db/schema";
 
 export default function CategoriesScreen() {
   const router = useRouter();
   const { categories, isLoading, deleteCategory } = useCategories();
   const { showConfirm, showAlert } = useAlert();
 
+  const [activeTab, setActiveTab] = useState<CategoryType>("EXPENSE");
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredCategories = useMemo(() => {
+    const list = categories.filter(
+      (c) => (c.type || "EXPENSE") === activeTab
+    );
     if (!searchQuery.trim()) {
-      return categories;
+      return list;
     }
     const q = searchQuery.toLowerCase().trim();
-    return categories.filter((c) => c.name.toLowerCase().includes(q));
-  }, [categories, searchQuery]);
+    return list.filter((c) => c.name.toLowerCase().includes(q));
+  }, [categories, activeTab, searchQuery]);
 
   function handleAddCategory() {
-    router.push("/(categories)/create-category" as any);
+    router.push({
+      pathname: "/(categories)/create-category" as any,
+      params: { defaultType: activeTab },
+    });
   }
 
   function handleEditCategory(cat: CategoryItem) {
@@ -157,8 +165,39 @@ export default function CategoriesScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search categories..."
-            className="mb-4"
+            className="mb-3"
           />
+
+          {/* Type Tab Selector */}
+          <View className="bg-dark-surface p-1 rounded-2xl flex-row items-center border border-dark-border mb-4">
+            {(["EXPENSE", "INCOME"] as const).map((t) => {
+              const isActive = activeTab === t;
+              const label = t === "EXPENSE" ? "Expense" : "Income";
+
+              return (
+                <TouchableOpacity
+                  key={t}
+                  onPress={() => setActiveTab(t)}
+                  activeOpacity={0.8}
+                  className={`flex-1 py-2.5 rounded-2xl items-center justify-center ${
+                    isActive
+                      ? "bg-dark-card border border-dark-border/80"
+                      : "bg-transparent"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm ${
+                      isActive
+                        ? "text-dark-text font-bold"
+                        : "text-dark-muted font-medium"
+                    }`}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
           {/* List of categories */}
           {isLoading ? (
@@ -182,12 +221,12 @@ export default function CategoriesScreen() {
                     />
                   </View>
                   <Text className="text-dark-text font-bold text-base mb-1">
-                    No Categories Found
+                    No {activeTab === "INCOME" ? "Income" : "Expense"} Categories Found
                   </Text>
                   <Text className="text-dark-muted text-xs text-center mb-4">
                     {searchQuery
-                      ? `No category matches "${searchQuery}"`
-                      : "You have not added any categories yet."}
+                      ? `No ${activeTab.toLowerCase()} category matches "${searchQuery}"`
+                      : `You have not added any ${activeTab.toLowerCase()} categories yet.`}
                   </Text>
                   <TouchableOpacity
                     onPress={handleAddCategory}
