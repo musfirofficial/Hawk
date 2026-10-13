@@ -61,8 +61,8 @@ export default function LoginScreen() {
       <View className="flex-1 justify-center pb-8">
         {/* Headline */}
         <Text className="text-dark-text text-[52px] leading-[58px] font-light tracking-[-1.5px] mb-6">
-          Banking{"\n"}Just Got{"\n"}
-          <Text className="font-normal text-white">Easier!</Text>
+          Personal{"\n"} Finance{"\n"}
+          <Text className="font-normal text-white">Companion!</Text>
         </Text>
 
         {/* Arrow + Classy Copy */}

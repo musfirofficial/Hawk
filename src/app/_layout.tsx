@@ -1,8 +1,18 @@
 import * as NavigationBar from "expo-navigation-bar";
+import * as SplashScreen from "expo-splash-screen";
 import * as SystemUI from "expo-system-ui";
+import {
+  useFonts,
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_600SemiBold,
+  DMSans_700Bold,
+  DMSans_800ExtraBold,
+  DMSans_900Black,
+} from "@expo-google-fonts/dm-sans";
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect } from "react";
-import { ActivityIndicator, Platform, View } from "react-native";
+import { ActivityIndicator, Platform, Text, TextInput, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AccountsProvider } from "../context/accounts";
 import { AlertProvider } from "../context/alert";
@@ -13,6 +23,9 @@ import { DebtsProvider } from "../context/debts";
 import { SecurityProvider } from "../context/security";
 import { TransactionsProvider } from "../context/transactions";
 import "../../global.css";
+
+// Prevent splash screen from auto-hiding until fonts are loaded
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Ensure root view background color is Hawk's dark luxury background on Android & iOS
 if (Platform.OS === "android") {
@@ -25,6 +38,21 @@ function NavigationGate() {
   const { hasOnboarded, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  // Hide splash screen smoothly only after auth settings and destination are ready
+  useEffect(() => {
+    if (!isLoading) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isLoading]);
+
+  // Safety fallback so splash screen never hangs in development
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     // Set Android navigation bar style to "light" (meaning light icons on dark background)
@@ -39,61 +67,89 @@ function NavigationGate() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === "(auth)";
+    const segmentList = segments as string[];
+    const inAuthGroup = segmentList[0] === "(auth)";
+    const isAtRoot = segmentList.length === 0;
+
+    // When at root, src/app/index.tsx performs instant declarative redirect
+    if (isAtRoot) return;
+
+    const isExemptAuthScreen =
+      segmentList.includes("recovery-key") ||
+      segmentList.includes("setup-pin");
 
     if (!hasOnboarded && !inAuthGroup) {
       // User hasn't finished onboarding yet
       router.replace("/(auth)/login");
-    } else if (hasOnboarded && inAuthGroup) {
-      // User has already completed onboarding, block auth screens
+    } else if (hasOnboarded && inAuthGroup && !isExemptAuthScreen) {
+      // User has already completed onboarding, block login/onboarding
       router.replace("/(tabs)");
     }
   }, [hasOnboarded, isLoading, segments]);
-
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-dark-bg items-center justify-center">
-        <ActivityIndicator size="large" color="#D4F938" />
-      </View>
-    );
-  }
 
   return (
     <>
       {Platform.OS === "android" ? (
         <NavigationBar.NavigationBar style="light" />
       ) : null}
-      <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="(settings)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="fulltransaction"
-        options={{
+      <Stack
+        screenOptions={{
           headerShown: false,
-          presentation: "card",
+          contentStyle: { backgroundColor: "#0B0D12" },
         }}
-      />
-      <Stack.Screen
-        name="(categories)/categories"
-        options={{
-          headerShown: false,
-          presentation: "card",
-        }}
-      />
-      <Stack.Screen
-        name="(categories)/create-category"
-        options={{
-          headerShown: false,
-          presentation: "card",
-        }}
-      />
-    </Stack>
+      >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(settings)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="fulltransaction"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+        <Stack.Screen
+          name="(categories)/categories"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+        <Stack.Screen
+          name="(categories)/create-category"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+        <Stack.Screen name="(transaction)" options={{ headerShown: false }} />
+        <Stack.Screen name="(account)" options={{ headerShown: false }} />
+      </Stack>
     </>
   );
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_600SemiBold,
+    DMSans_700Bold,
+    DMSans_800ExtraBold,
+    DMSans_900Black,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <AuthProvider>

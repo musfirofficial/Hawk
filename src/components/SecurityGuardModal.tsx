@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  KeyboardAvoidingView,
   Platform,
   Text,
+  TextInput,
   TouchableOpacity,
   Vibration,
   View,
@@ -39,6 +41,8 @@ export function SecurityGuardModal({
   >(null);
   const [biometricLabel, setBiometricLabel] = useState("Biometrics");
 
+  const pinInputRef = useRef<TextInput>(null);
+
   // Check biometric capability when modal opens
   useEffect(() => {
     async function checkBio() {
@@ -62,6 +66,16 @@ export function SecurityGuardModal({
     }
   }, [visible, settings?.biometricsEnabled]);
 
+  // When switching to or opening in PIN mode, automatically focus the hidden input to open the numpad
+  useEffect(() => {
+    if (visible && viewMode === "PIN") {
+      const timer = setTimeout(() => {
+        pinInputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [visible, viewMode]);
+
   // Attempt automatic biometrics on open if in BIOMETRIC view
   useEffect(() => {
     let isMounted = true;
@@ -72,7 +86,7 @@ export function SecurityGuardModal({
         setTimeout(async () => {
           if (!isMounted) return;
           const res = await authenticateWithBiometrics(
-            description || title || "Confirm Action",
+            description || title || "Confirm Action"
           );
           if (res.success && isMounted) {
             onSuccess();
@@ -94,7 +108,7 @@ export function SecurityGuardModal({
   async function handleManualBiometric() {
     setErrorMsg(null);
     const res = await authenticateWithBiometrics(
-      description || title || "Confirm Action",
+      description || title || "Confirm Action"
     );
     if (res.success) {
       onSuccess();
@@ -103,18 +117,16 @@ export function SecurityGuardModal({
     }
   }
 
-  function handleKeyPress(num: string) {
-    if (enteredPin.length >= 4) return;
+  function handlePinChange(text: string) {
+    const cleaned = text.replace(/[^0-9]/g, "").slice(0, 4);
+    setEnteredPin(cleaned);
     setErrorMsg(null);
 
-    const next = enteredPin + num;
-    setEnteredPin(next);
-
-    if (next.length === 4) {
+    if (cleaned.length === 4) {
       const savedPin = settings?.pin;
 
       // If no PIN set in DB, allow access
-      if (!savedPin || next === savedPin) {
+      if (!savedPin || cleaned === savedPin) {
         setTimeout(() => {
           onSuccess();
         }, 100);
@@ -125,15 +137,8 @@ export function SecurityGuardModal({
         setErrorMsg("Incorrect PIN. Please try again.");
         setTimeout(() => {
           setEnteredPin("");
-        }, 300);
+        }, 350);
       }
-    }
-  }
-
-  function handleDeletePress() {
-    setErrorMsg(null);
-    if (enteredPin.length > 0) {
-      setEnteredPin((prev) => prev.slice(0, -1));
     }
   }
 
@@ -141,7 +146,10 @@ export function SecurityGuardModal({
 
   return (
     <HawkModal visible={visible} animationType="fade" onRequestClose={onCancel}>
-      <View className="flex-1 bg-black/80 justify-center items-center px-6">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1 bg-black/80 justify-center items-center px-6"
+      >
         <View className="w-full max-w-sm bg-dark-surface border border-dark-border rounded-3xl p-6 items-center shadow-2xl">
           {/* ======================================================== */}
           {/* VIEW 1: DYNAMIC BIOMETRIC FIRST VIEW */}
@@ -176,12 +184,6 @@ export function SecurityGuardModal({
                   `Authenticate with ${biometricLabel} to complete verification`}
               </Text>
 
-              {/* {errorMsg && (
-                <Text className="text-brand-expense text-xs font-semibold text-center mb-4">
-                  {errorMsg}
-                </Text>
-              )} */}
-
               {/* Verify Button */}
               <TouchableOpacity
                 onPress={handleManualBiometric}
@@ -193,7 +195,7 @@ export function SecurityGuardModal({
                 </Text>
               </TouchableOpacity>
 
-              {/* Use PIN Link (Switches to Current Layout) */}
+              {/* Use PIN Link (Switches to Compact PIN View) */}
               <TouchableOpacity
                 onPress={() => {
                   setErrorMsg(null);
@@ -220,7 +222,7 @@ export function SecurityGuardModal({
             </View>
           ) : (
             /* ======================================================== */
-            /* VIEW 2: 4-DIGIT PIN NUMPAD VIEW (CURRENT LAYOUT) */
+            /* VIEW 2: 4 CIRCLE PLACEHOLDERS + DEVICE NUMPAD KEYBOARD */
             /* ======================================================== */
             <View className="w-full items-center">
               {/* Header Title */}
@@ -233,26 +235,47 @@ export function SecurityGuardModal({
                 {description || "Enter your 4-digit security PIN to verify"}
               </Text>
 
-              {/* 4 PIN Boxes */}
-              <View className="flex-row items-center justify-center gap-4 mb-6">
+              {/* 4 Circle Placeholders */}
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => pinInputRef.current?.focus()}
+                className="flex-row items-center justify-center gap-4 mb-6"
+              >
                 {[0, 1, 2, 3].map((index) => {
                   const isFilled = enteredPin.length > index;
                   return (
                     <View
                       key={index}
-                      className={`w-14 h-14 rounded-2xl items-center justify-center border-2 ${
+                      className={`w-14 h-14 rounded-full items-center justify-center border-2 ${
                         isFilled
-                          ? "border-brand-accent bg-brand-accent/15"
+                          ? "border-brand-accent bg-brand-accent/20"
                           : "border-dark-border bg-dark-card"
                       }`}
                     >
                       {isFilled && (
-                        <View className="w-3.5 h-3.5 rounded-full bg-brand-accent" />
+                        <View className="w-4 h-4 rounded-full bg-brand-accent" />
                       )}
                     </View>
                   );
                 })}
-              </View>
+              </TouchableOpacity>
+
+              {/* Hidden TextInput that triggers the device's native numpad */}
+              <TextInput
+                ref={pinInputRef}
+                value={enteredPin}
+                onChangeText={handlePinChange}
+                keyboardType="number-pad"
+                maxLength={4}
+                autoFocus={true}
+                caretHidden={true}
+                style={{
+                  position: "absolute",
+                  opacity: 0,
+                  width: 1,
+                  height: 1,
+                }}
+              />
 
               {/* Error Message */}
               {errorMsg ? (
@@ -260,85 +283,8 @@ export function SecurityGuardModal({
                   {errorMsg}
                 </Text>
               ) : (
-                <View className="h-5 mb-3" />
+                <View className="h-5 mb-2" />
               )}
-
-              {/* Numeric Keypad */}
-              <View className="w-full gap-3 mb-4">
-                {/* Row 1 */}
-                <View className="flex-row justify-between">
-                  {["1", "2", "3"].map((digit) => (
-                    <KeypadButton
-                      key={digit}
-                      value={digit}
-                      onPress={() => handleKeyPress(digit)}
-                    />
-                  ))}
-                </View>
-
-                {/* Row 2 */}
-                <View className="flex-row justify-between">
-                  {["4", "5", "6"].map((digit) => (
-                    <KeypadButton
-                      key={digit}
-                      value={digit}
-                      onPress={() => handleKeyPress(digit)}
-                    />
-                  ))}
-                </View>
-
-                {/* Row 3 */}
-                <View className="flex-row justify-between">
-                  {["7", "8", "9"].map((digit) => (
-                    <KeypadButton
-                      key={digit}
-                      value={digit}
-                      onPress={() => handleKeyPress(digit)}
-                    />
-                  ))}
-                </View>
-
-                {/* Row 4: Biometrics / 0 / Backspace */}
-                <View className="flex-row justify-between items-center">
-                  {biometricAvailable && settings?.biometricsEnabled ? (
-                    <TouchableOpacity
-                      onPress={() => {
-                        setErrorMsg(null);
-                        setViewMode("BIOMETRIC");
-                        handleManualBiometric();
-                      }}
-                      className="w-20 h-16 rounded-2xl items-center justify-center active:bg-dark-card"
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name={
-                          biometricType === "FACE_ID"
-                            ? "scan-outline"
-                            : "finger-print"
-                        }
-                        size={28}
-                        color="#D4F938"
-                      />
-                    </TouchableOpacity>
-                  ) : (
-                    <View className="w-20 h-16" />
-                  )}
-
-                  <KeypadButton value="0" onPress={() => handleKeyPress("0")} />
-
-                  <TouchableOpacity
-                    onPress={handleDeletePress}
-                    className="w-20 h-16 rounded-2xl items-center justify-center active:bg-dark-card"
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="backspace-outline"
-                      size={26}
-                      color="#94A3B8"
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
 
               {/* Switch back to biometrics link if enabled */}
               {biometricAvailable && settings?.biometricsEnabled && (
@@ -369,25 +315,7 @@ export function SecurityGuardModal({
             </View>
           )}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </HawkModal>
-  );
-}
-
-function KeypadButton({
-  value,
-  onPress,
-}: {
-  value: string;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      className="w-20 h-16 rounded-2xl items-center justify-center bg-dark-card/50 active:bg-brand-accent/20 active:border active:border-brand-accent/40"
-      activeOpacity={0.6}
-    >
-      <Text className="text-dark-text text-2xl font-bold">{value}</Text>
-    </TouchableOpacity>
   );
 }

@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { SearchBar } from "../../components/SearchBar";
 import { CreateContact } from "../../components/contacts/CreateContact";
 import { Editcontact } from "../../components/contacts/Editcontact";
 import { useAuth } from "../../context/auth";
@@ -38,7 +39,7 @@ export default function ContactsScreen() {
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-dark-bg">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-5 py-4 border-b border-dark-border">
+      <View className="flex-row items-center justify-between px-5 pt-3 pb-1">
         <Text className="text-dark-text text-xl font-bold">Contacts</Text>
         <TouchableOpacity
           onPress={() => setIsCreateOpen(true)}
@@ -49,23 +50,14 @@ export default function ContactsScreen() {
         </TouchableOpacity>
       </View>
 
-      <View className="px-5 pt-3 flex-1">
+      <View className="px-5 pt-2 flex-1">
         {/* Search Bar */}
-        <View className="bg-dark-surface border border-dark-border rounded-2xl px-4 py-2.5 flex-row items-center gap-2 mb-4">
-          <Ionicons name="search" size={18} color="#60677C" />
-          <TextInput
-            placeholder="Search contact or company..."
-            placeholderTextColor="#60677C"
-            value={search}
-            onChangeText={setSearch}
-            className="flex-1 text-dark-text text-sm py-0"
-          />
-          {search ? (
-            <TouchableOpacity onPress={() => setSearch("")}>
-              <Ionicons name="close-circle" size={18} color="#60677C" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
+        <SearchBar
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search contact or company..."
+          className="mb-4"
+        />
 
         {/* Contacts List */}
         <ScrollView

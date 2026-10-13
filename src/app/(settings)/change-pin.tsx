@@ -1,5 +1,4 @@
 import { useRouter } from "expo-router";
-import React from "react";
 import { SetUpPin } from "../../components/SetUpPin";
 import { useAlert } from "../../context/alert";
 import { useAuth } from "../../context/auth";
@@ -24,11 +23,6 @@ export default function ChangePinScreen() {
 
   return (
     <SetUpPin
-      headerTitle="Change PIN"
-      createTitle="Enter new PIN"
-      confirmTitle="Confirm new PIN"
-      createSubtitle="Choose a new 4-digit PIN for your security checks."
-      confirmSubtitle="Re-enter your new 4-digit PIN to confirm."
       onSuccess={handleSuccess}
       onBack={() => router.back()}
       showSkip={false}

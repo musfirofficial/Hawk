@@ -122,6 +122,14 @@ export function Calendar({
     }
   }, [value]);
 
+  const canGoNextMonth = useMemo(() => {
+    if (!maxDate) return true;
+    const nextM = viewMonth === 11 ? 0 : viewMonth + 1;
+    const nextY = viewMonth === 11 ? viewYear + 1 : viewYear;
+    const firstDayOfNextMonth = formatYMD(nextY, nextM, 1);
+    return firstDayOfNextMonth <= maxDate;
+  }, [maxDate, viewMonth, viewYear]);
+
   const handlePrevMonth = () => {
     if (viewMonth === 0) {
       setViewYear((prev) => prev - 1);
@@ -132,6 +140,7 @@ export function Calendar({
   };
 
   const handleNextMonth = () => {
+    if (!canGoNextMonth) return;
     if (viewMonth === 11) {
       setViewYear((prev) => prev + 1);
       setViewMonth(0);
@@ -149,6 +158,7 @@ export function Calendar({
 
   const handleSelectDay = (day: CalendarDayItem) => {
     if (day.isDisabled) return;
+    if (maxDate && day.dateString > maxDate) return;
 
     if (day.isPrevMonth) {
       handlePrevMonth();
@@ -276,9 +286,12 @@ export function Calendar({
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleNextMonth}
+            disabled={!canGoNextMonth}
             activeOpacity={0.7}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            className="w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border"
+            className={`w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border ${
+              !canGoNextMonth ? "opacity-30" : ""
+            }`}
           >
             <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
           </TouchableOpacity>

@@ -26,21 +26,32 @@ export const DEBT_TYPES = ["LEND", "BORROW"] as const;
 export type DebtType = (typeof DEBT_TYPES)[number];
 
 export const SUPPORTED_CURRENCIES = [
-  { code: "USD", symbol: "$", name: "US Dollar" },
-  { code: "EUR", symbol: "€", name: "Euro" },
-  { code: "GBP", symbol: "£", name: "British Pound" },
-  { code: "INR", symbol: "₹", name: "Indian Rupee" },
-  { code: "AED", symbol: "د.إ", name: "UAE Dirham" },
-  { code: "SAR", symbol: "﷼", name: "Saudi Riyal" },
-  { code: "JPY", symbol: "¥", name: "Japanese Yen" },
-  { code: "CAD", symbol: "$", name: "Canadian Dollar" },
-  { code: "AUD", symbol: "$", name: "Australian Dollar" },
-  { code: "SGD", symbol: "$", name: "Singapore Dollar" },
-  { code: "CHF", symbol: "Fr", name: "Swiss Franc" },
-  { code: "CNY", symbol: "¥", name: "Chinese Yuan" },
-  { code: "BRL", symbol: "R$", name: "Brazilian Real" },
-  { code: "TRY", symbol: "₺", name: "Turkish Lira" },
-  { code: "LKR", symbol: "Rs", name: "Srilanka Rupee" },
+  // --- Original Currencies ---
+  { code: "USD", symbol: "\u0024", name: "US Dollar" }, // $
+  { code: "EUR", symbol: "\u20AC", name: "Euro" }, // €
+  { code: "GBP", symbol: "\u00A3", name: "British Pound" }, // £
+  { code: "INR", symbol: "\u20B9", name: "Indian Rupee" }, // ₹
+  { code: "AED", symbol: "\u062F\u002E\u0625", name: "UAE Dirham" }, // د.إ
+  { code: "SAR", symbol: "\uFDFC", name: "Saudi Riyal" }, // ﷼
+  { code: "JPY", symbol: "\u00A5", name: "Japanese Yen" }, // ¥
+  { code: "CAD", symbol: "\u0024", name: "Canadian Dollar" }, // $
+  { code: "AUD", symbol: "\u0024", name: "Australian Dollar" }, // $
+  { code: "SGD", symbol: "\u0024", name: "Singapore Dollar" }, // $
+  { code: "CHF", symbol: "\u0046\u0072", name: "Swiss Franc" }, // Fr
+  { code: "CNY", symbol: "\u00A5", name: "Chinese Yuan" }, // ¥
+  { code: "BRL", symbol: "\u0052\u0024", name: "Brazilian Real" }, // R$
+  { code: "TRY", symbol: "\u20BA", name: "Turkish Lira" }, // ₺
+  { code: "LKR", symbol: "\u0052\u0073", name: "Srilanka Rupee" }, // Rs
+  { code: "CNH", symbol: "\u00A5", name: "Chinese Renminbi" }, // ¥
+  { code: "HKD", symbol: "\u0024", name: "Hong Kong Dollar" }, // $
+  { code: "NZD", symbol: "\u0024", name: "New Zealand Dollar" }, // $
+  { code: "KRW", symbol: "\u20A9", name: "South Korean Won" }, // ₩
+  { code: "MXN", symbol: "\u0024", name: "Mexican Peso" }, // $
+  { code: "ZAR", symbol: "\u0052", name: "South African Rand" }, // R
+  { code: "IDR", symbol: "\u0052\u0070", name: "Indonesian Rupiah" }, // Rp
+  { code: "MYR", symbol: "\u0052\u004D", name: "Malaysian Ringgit" }, // RM
+  { code: "THB", symbol: "\u0E3F", name: "Thai Baht" }, // ฿
+  { code: "KWD", symbol: "\u062F\u002E\u0643", name: "Kuwaiti Dinar" }, // د.ك
 ] as const;
 
 export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number]["code"];
@@ -48,13 +59,11 @@ export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number]["code"];
 export const NUMBER_FORMATS = [
   {
     id: "COMMA_DOT",
-    label: "1,234.56",
-    example: "1,234.56 (Comma thousands, point decimal)",
+    label: "Comma separator",
   },
   {
     id: "DOT_COMMA",
-    label: "1.234,56",
-    example: "1.234,56 (Point thousands, comma decimal)",
+    label: "Period separator",
   },
 ] as const;
 
@@ -216,6 +225,7 @@ export const appSettings = sqliteTable("app_settings", {
   lastBackup: text("last_backup"), // Timestamp of last Google Drive backup
   profilePic: text("profile_pic"), // Local path/URI only, excluded from cloud sync
   pin: text("pin"), // 4-digit security PIN
+  recoveryKey: text("recovery_key"), // 8-character reset recovery key
   biometricsEnabled: integer("biometrics_enabled", { mode: "boolean" })
     .default(false)
     .notNull(),
@@ -267,9 +277,7 @@ export const securityRules = sqliteTable("security_rules", {
   backupRestore: integer("backup_restore", { mode: "boolean" })
     .default(true)
     .notNull(),
-  resetData: integer("reset_data", { mode: "boolean" })
-    .default(true)
-    .notNull(),
+  resetData: integer("reset_data", { mode: "boolean" }).default(true).notNull(),
   updatedAt: text("updated_at")
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),

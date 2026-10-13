@@ -52,12 +52,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="accounts"
+        name="budget"
         options={{
-          title: "Accounts",
+          title: "Budget",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? "wallet" : "wallet-outline"}
+              name={focused ? "pie-chart" : "pie-chart-outline"}
               size={22}
               color={color}
             />

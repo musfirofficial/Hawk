@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "../../components/ScreenHeader";
+import { SearchBar } from "../../components/SearchBar";
 import { useAlert } from "../../context/alert";
 import { CategoryItem, useCategories } from "../../context/categories";
 
@@ -123,9 +124,9 @@ export default function CategoriesScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
       >
-        {/* Top Header - No plus icon in title bar */}
+        {/* Top Header with Centered Title */}
         <ScreenHeader
-          title="Categories"
+          title="Manage Categories"
           showBack={true}
           onBack={() => router.back()}
         />
@@ -152,26 +153,12 @@ export default function CategoriesScreen() {
           </TouchableOpacity>
 
           {/* Search Box */}
-          <View className="bg-dark-surface border border-dark-border rounded-xl px-3.5 py-3.5 flex-row items-center gap-2.5 mb-4">
-            <Ionicons name="search-outline" size={18} color="#60677C" />
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search categories..."
-              placeholderTextColor="#60677C"
-              className="flex-1 text-dark-text text-sm font-medium py-0"
-              autoCapitalize="none"
-              clearButtonMode="while-editing"
-            />
-            {searchQuery ? (
-              <TouchableOpacity
-                onPress={() => setSearchQuery("")}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="close-circle" size={16} color="#94A3B8" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search categories..."
+            className="mb-4"
+          />
 
           {/* List of categories */}
           {isLoading ? (

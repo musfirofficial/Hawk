@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   StyleProp,
   ViewStyle,
   DimensionValue,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -37,6 +40,10 @@ export interface HawkFlyUpProps {
   className?: string;
   /** Children rendered inside the fly-up */
   children: React.ReactNode;
+  /** Whether the modal should automatically lift above the keypad (default: true) */
+  avoidKeyboard?: boolean;
+  /** Optional vertical offset for the keyboard avoiding view */
+  keyboardVerticalOffset?: number;
 }
 
 export function HawkFlyUp({
@@ -51,14 +58,42 @@ export function HawkFlyUp({
   style,
   className = "",
   children,
+  avoidKeyboard = true,
+  keyboardVerticalOffset = 0,
 }: HawkFlyUpProps) {
   const insets = useSafeAreaInsets();
   const panY = useRef(new Animated.Value(0)).current;
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  // Reset drag position on open
+  // Track keyboard height dynamically to reliably lift modal above keypad on Android
+  useEffect(() => {
+    if (!avoidKeyboard) return;
+
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [avoidKeyboard]);
+
+  // Reset drag position on open and clear keyboard offset on close
   useEffect(() => {
     if (visible) {
       panY.setValue(0);
+    } else {
+      setKeyboardHeight(0);
     }
   }, [visible, panY]);
 
@@ -102,6 +137,78 @@ export function HawkFlyUp({
     })
   ).current;
 
+  const modalBody = (
+    <>
+      {/* Backdrop dismiss */}
+      <Pressable
+        className="flex-1"
+        onPress={() => {
+          Keyboard.dismiss();
+          onClose();
+        }}
+      />
+
+      {/* Fly-up Bottom Card */}
+      <Animated.View
+        style={[
+          {
+            transform: [{ translateY: panY }],
+            maxHeight: maxHeight,
+            paddingBottom:
+              Math.max(insets.bottom, 24) +
+              (Platform.OS === "android" && avoidKeyboard ? keyboardHeight : 0),
+          },
+          style,
+        ]}
+        className={`bg-dark-surface rounded-t-3xl px-5 pt-3 ${className}`}
+      >
+        {/* Top Drag Handle Bar */}
+        {showDragHandle ? (
+          <View
+            {...panResponder.panHandlers}
+            className="items-center py-2 -mt-1 active:opacity-70"
+          >
+            <View className="w-12 h-1.5 bg-dark-border rounded-full" />
+          </View>
+        ) : null}
+
+        {/* Optional Sheet Header */}
+        {(title || showCloseButton) ? (
+          <View className="flex-row items-center justify-between pb-3 mb-3 border-b border-dark-border/40">
+            <View className="flex-1 mr-2">
+              {title ? (
+                <Text className="text-dark-text text-lg font-bold">
+                  {title}
+                </Text>
+              ) : null}
+              {subtitle ? (
+                <Text className="text-dark-muted text-xs mt-0.5">
+                  {subtitle}
+                </Text>
+              ) : null}
+            </View>
+            {showCloseButton ? (
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  onClose();
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className="w-8 h-8 rounded-full bg-dark-card border border-dark-border items-center justify-center active:bg-dark-cardHover"
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={16} color="#94A3B8" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Body Content */}
+        {children}
+      </Animated.View>
+    </>
+  );
+
   return (
     <HawkModal
       visible={visible}
@@ -109,64 +216,17 @@ export function HawkFlyUp({
       transparent={true}
       onRequestClose={onClose}
     >
-      <View className="flex-1 justify-end bg-black/70">
-        {/* Backdrop dismiss */}
-        <Pressable className="flex-1" onPress={onClose} />
-
-        {/* Fly-up Bottom Card */}
-        <Animated.View
-          style={[
-            {
-              transform: [{ translateY: panY }],
-              maxHeight: maxHeight,
-              paddingBottom: Math.max(insets.bottom, 24),
-            },
-            style,
-          ]}
-          className={`bg-dark-surface rounded-t-3xl px-5 pt-3 ${className}`}
+      {avoidKeyboard ? (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={keyboardVerticalOffset}
+          className="flex-1 justify-end bg-black/70"
         >
-          {/* Top Drag Handle Bar */}
-          {showDragHandle ? (
-            <View
-              {...panResponder.panHandlers}
-              className="items-center py-2 -mt-1 active:opacity-70"
-            >
-              <View className="w-12 h-1.5 bg-dark-border rounded-full" />
-            </View>
-          ) : null}
-
-          {/* Optional Sheet Header */}
-          {(title || showCloseButton) ? (
-            <View className="flex-row items-center justify-between pb-3 mb-3 border-b border-dark-border/40">
-              <View className="flex-1 mr-2">
-                {title ? (
-                  <Text className="text-dark-text text-lg font-bold">
-                    {title}
-                  </Text>
-                ) : null}
-                {subtitle ? (
-                  <Text className="text-dark-muted text-xs mt-0.5">
-                    {subtitle}
-                  </Text>
-                ) : null}
-              </View>
-              {showCloseButton ? (
-                <TouchableOpacity
-                  onPress={onClose}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  className="w-8 h-8 rounded-full bg-dark-card border border-dark-border items-center justify-center active:bg-dark-cardHover"
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="close" size={16} color="#94A3B8" />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          ) : null}
-
-          {/* Body Content */}
-          {children}
-        </Animated.View>
-      </View>
+          {modalBody}
+        </KeyboardAvoidingView>
+      ) : (
+        <View className="flex-1 justify-end bg-black/70">{modalBody}</View>
+      )}
     </HawkModal>
   );
 }

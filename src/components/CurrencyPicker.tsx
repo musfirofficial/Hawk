@@ -1,14 +1,13 @@
-import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   FlatList,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SUPPORTED_CURRENCIES } from "../db/schema";
 import { HawkFlyUp } from "./HawkFlyUp";
+import { SearchBar } from "./SearchBar";
 
 interface CurrencyPickerProps {
   visible: boolean;
@@ -35,30 +34,25 @@ export function CurrencyPicker({
     );
   });
 
+  function handleClose() {
+    setSearch("");
+    onClose();
+  }
+
   return (
     <HawkFlyUp
       visible={visible}
-      onClose={onClose}
+      onClose={handleClose}
       title="Select Currency"
       maxHeight="80%"
     >
-      {/* Search Box */}
-      <View className="bg-dark-card border border-dark-border rounded-xl px-3 py-2.5 flex-row items-center gap-2.5 mb-3">
-        <Ionicons name="search" size={16} color="#60677C" />
-        <TextInput
-          placeholder="Search currency..."
-          placeholderTextColor="#60677C"
-          value={search}
-          onChangeText={setSearch}
-          className="flex-1 text-dark-text text-sm py-0"
-          autoCorrect={false}
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")}>
-            <Ionicons name="close-circle" size={16} color="#60677C" />
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Search Box Component */}
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search currency..."
+        className="mb-3"
+      />
 
       {/* Currency List */}
       <FlatList
@@ -69,29 +63,42 @@ export function CurrencyPicker({
         ItemSeparatorComponent={() => (
           <View className="h-[1px] bg-dark-border/50" />
         )}
+        ListEmptyComponent={() => (
+          <View className="py-8 items-center justify-center">
+            <Text className="text-dark-muted text-sm font-medium">
+              No currencies found matching &quot;{search}&quot;
+            </Text>
+          </View>
+        )}
         renderItem={({ item }) => {
           const isSelected = selectedCode === item.code;
           return (
             <TouchableOpacity
               onPress={() => {
                 onSelect(item.code);
-                onClose();
+                handleClose();
               }}
               className={`flex-row items-center justify-between py-3.5 px-3 rounded-xl ${
                 isSelected ? "bg-brand-accent/10" : ""
               }`}
               activeOpacity={0.7}
             >
-              {/* Name only on left */}
-              <Text
-                className={`text-base font-medium ${
-                  isSelected ? "text-brand-accent font-bold" : "text-dark-text"
-                }`}
-              >
-                {item.name}
-              </Text>
+              {/* Name & Code on left */}
+              <View className="flex-row items-center gap-2 flex-1 mr-2">
+                <Text
+                  className={`text-base font-medium ${
+                    isSelected ? "text-brand-accent font-bold" : "text-dark-text"
+                  }`}
+                  numberOfLines={1}
+                >
+                  {item.name}
+                </Text>
+                <Text className="text-dark-muted text-xs font-semibold">
+                  ({item.code})
+                </Text>
+              </View>
 
-              {/* Symbol only on right */}
+              {/* Symbol on right */}
               <Text
                 className={`text-lg font-bold ${
                   isSelected ? "text-brand-accent" : "text-brand-accent/80"

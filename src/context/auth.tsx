@@ -11,6 +11,17 @@ import {
   performGoogleSignOut,
 } from "../services/googleAuth";
 
+export function generateRecoveryKey(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let part1 = "";
+  let part2 = "";
+  for (let i = 0; i < 4; i++) {
+    part1 += chars.charAt(Math.floor(Math.random() * chars.length));
+    part2 += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `${part1}-${part2}`;
+}
+
 export { GoogleUserInfo };
 
 interface AuthContextType {
@@ -27,10 +38,12 @@ interface AuthContextType {
     numberFormat: NumberFormatId;
     profilePic?: string | null;
     pin?: string;
+    recoveryKey?: string;
     biometricsEnabled?: boolean;
   }) => Promise<void>;
   updateSecuritySettings: (params: {
     pin?: string;
+    recoveryKey?: string;
     biometricsEnabled?: boolean;
   }) => Promise<void>;
   disconnectGoogle: () => Promise<void>;
@@ -110,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     numberFormat: NumberFormatId;
     profilePic?: string | null;
     pin?: string;
+    recoveryKey?: string;
     biometricsEnabled?: boolean;
   }) {
     try {
@@ -127,6 +141,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             numberFormat: params.numberFormat,
             profilePic: params.profilePic || null,
             pin: params.pin !== undefined ? params.pin : existing[0].pin,
+            recoveryKey:
+              params.recoveryKey !== undefined
+                ? params.recoveryKey
+                : existing[0].recoveryKey,
             biometricsEnabled:
               params.biometricsEnabled !== undefined
                 ? params.biometricsEnabled
@@ -146,6 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             numberFormat: params.numberFormat,
             profilePic: params.profilePic || null,
             pin: params.pin || null,
+            recoveryKey: params.recoveryKey || null,
             biometricsEnabled: params.biometricsEnabled || false,
             googleEmail,
             googleName,
@@ -162,9 +181,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Update Security Settings (PIN and/or Biometrics)
+  // Update Security Settings (PIN and/or Biometrics / Recovery Key)
   async function updateSecuritySettings(params: {
     pin?: string;
+    recoveryKey?: string;
     biometricsEnabled?: boolean;
   }) {
     try {
@@ -174,6 +194,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         db.update(schema.appSettings)
           .set({
             ...(params.pin !== undefined && { pin: params.pin }),
+            ...(params.recoveryKey !== undefined && {
+              recoveryKey: params.recoveryKey,
+            }),
             ...(params.biometricsEnabled !== undefined && {
               biometricsEnabled: params.biometricsEnabled,
             }),

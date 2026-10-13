@@ -34,7 +34,7 @@ export default function DebtsScreen() {
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-dark-bg">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-5 py-4 border-b border-dark-border">
+      <View className="flex-row items-center justify-between px-5 pt-3 pb-1">
         <Text className="text-dark-text text-xl font-bold">Debts & Loans</Text>
         <TouchableOpacity
           onPress={() => handleOpenCreate(activeTab)}
@@ -48,7 +48,7 @@ export default function DebtsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
-        className="flex-1 px-5 pt-4"
+        className="flex-1 px-5 pt-3"
       >
         {/* Summary Metrics */}
         <View className="flex-row gap-3 mb-6">

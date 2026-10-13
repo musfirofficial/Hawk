@@ -10,8 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "../components/ScreenHeader";
-import { CreateTransaction } from "../components/transactions/CreateTransaction";
-import { EditTransaction } from "../components/transactions/EditTransaction";
+import { SearchBar } from "../components/SearchBar";
 import { TransactionCard } from "../components/transactions/TransactionCard";
 import { useAccounts } from "../context/accounts";
 import {
@@ -28,8 +27,6 @@ export default function FullTransactionScreen() {
   const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedTx, setSelectedTx] = useState<TransactionItem | null>(null);
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -115,7 +112,7 @@ export default function FullTransactionScreen() {
               <Ionicons name="search" size={18} color="#F8FAFC" />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => setIsCreateOpen(true)}
+              onPress={() => router.push("/(transaction)/create" as any)}
               className="w-10 h-10 rounded-full bg-brand-accent items-center justify-center"
               activeOpacity={0.8}
             >
@@ -128,22 +125,12 @@ export default function FullTransactionScreen() {
       {/* Optional Search Bar */}
       {showSearch && (
         <View className="px-5 pt-3">
-          <View className="bg-dark-surface border border-dark-border rounded-2xl px-4 py-2.5 flex-row items-center gap-2">
-            <Ionicons name="search" size={18} color="#60677C" />
-            <TextInput
-              placeholder="Search by note, category, contact..."
-              placeholderTextColor="#60677C"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              className="flex-1 text-dark-text text-sm py-0"
-              autoFocus
-            />
-            {searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery("")}>
-                <Ionicons name="close-circle" size={18} color="#60677C" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search by note, category, contact..."
+            autoFocus
+          />
         </View>
       )}
 
@@ -240,7 +227,7 @@ export default function FullTransactionScreen() {
       >
         {groupedByDate.length === 0 ? (
           <TouchableOpacity
-            onPress={() => setIsCreateOpen(true)}
+            onPress={() => router.push("/(transaction)/create" as any)}
             activeOpacity={0.7}
             className="bg-dark-surface border border-dashed border-dark-border p-8 rounded-2xl items-center justify-center mt-6"
           >
@@ -265,7 +252,7 @@ export default function FullTransactionScreen() {
                   <TransactionCard
                     key={tx.id}
                     transaction={tx}
-                    onPress={() => setSelectedTx(tx)}
+                    onPress={() => router.push(`/(transaction)/${tx.id}` as any)}
                   />
                 ))}
               </View>
@@ -273,19 +260,6 @@ export default function FullTransactionScreen() {
           ))
         )}
       </ScrollView>
-
-      {/* Create Transaction Modal */}
-      <CreateTransaction
-        visible={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-      />
-
-      {/* Edit / View Transaction Modal */}
-      <EditTransaction
-        visible={Boolean(selectedTx)}
-        onClose={() => setSelectedTx(null)}
-        transaction={selectedTx}
-      />
     </SafeAreaView>
   );
 }

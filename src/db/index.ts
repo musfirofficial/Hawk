@@ -83,6 +83,7 @@ export function ensureDatabaseInitialized() {
         last_backup TEXT,
         profile_pic TEXT,
         pin TEXT,
+        recovery_key TEXT,
         biometrics_enabled INTEGER DEFAULT 0 NOT NULL,
         google_email TEXT,
         google_name TEXT,
@@ -108,6 +109,9 @@ export function ensureDatabaseInitialized() {
     // Safe column migrations for existing databases
     try {
       expoDb.execSync("ALTER TABLE app_settings ADD COLUMN pin TEXT;");
+    } catch {}
+    try {
+      expoDb.execSync("ALTER TABLE app_settings ADD COLUMN recovery_key TEXT;");
     } catch {}
     try {
       expoDb.execSync(

@@ -5,6 +5,15 @@ module.exports = {
   darkMode: "class",
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["DMSans_400Regular"],
+        regular: ["DMSans_400Regular"],
+        medium: ["DMSans_500Medium"],
+        semibold: ["DMSans_600SemiBold"],
+        bold: ["DMSans_700Bold"],
+        extrabold: ["DMSans_800ExtraBold"],
+        black: ["DMSans_900Black"],
+      },
       colors: {
         dark: {
           bg: "#0B0D12",
@@ -33,5 +42,28 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    ({ addUtilities }) => {
+      addUtilities({
+        ".font-normal": {
+          fontFamily: "DMSans_400Regular",
+        },
+        ".font-medium": {
+          fontFamily: "DMSans_500Medium",
+        },
+        ".font-semibold": {
+          fontFamily: "DMSans_600SemiBold",
+        },
+        ".font-bold": {
+          fontFamily: "DMSans_700Bold",
+        },
+        ".font-extrabold": {
+          fontFamily: "DMSans_800ExtraBold",
+        },
+        ".font-black": {
+          fontFamily: "DMSans_900Black",
+        },
+      });
+    },
+  ],
 };

@@ -1,6 +1,8 @@
 import { useRouter } from "expo-router";
 import React from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ProfileForm, ProfileFormData } from "../../components/ProfileForm";
+import { ScreenHeader } from "../../components/ScreenHeader";
 import { useAuth } from "../../context/auth";
 
 export default function OnboardingScreen() {
@@ -28,13 +30,15 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <ProfileForm
-      mode="onboarding"
-      initialData={{
-        name: pendingGoogleUser?.name || "",
-      }}
-      onSubmit={handleSubmit}
-      onBack={handleBack}
-    />
+    <SafeAreaView className="flex-1 bg-dark-bg">
+      <ScreenHeader title="Complete Profile" onBack={handleBack} />
+      <ProfileForm
+        mode="onboarding"
+        initialData={{
+          name: pendingGoogleUser?.name || "",
+        }}
+        onSubmit={handleSubmit}
+      />
+    </SafeAreaView>
   );
 }

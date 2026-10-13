@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { forwardRef, useImperativeHandle, useState } from "react";
 import {
-  ActivityIndicator,
   Platform,
   Text,
   TouchableOpacity,
@@ -9,12 +8,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { HawkModal } from "./HawkModal";
-import {
-  authenticateWithBiometrics,
-  BiometricCapability,
-  getBiometricCapability,
-} from "../services/biometrics";
+import { useAuth } from "../context/auth";
+
+export interface SetUpPinHandle {
+  handleBack: () => boolean;
+}
 
 export interface SetUpPinProps {
   headerTitle?: string;
@@ -25,337 +23,338 @@ export interface SetUpPinProps {
   onSuccess: (pin: string, enableBiometrics: boolean) => void | Promise<void>;
   onBack?: () => void;
   showBack?: boolean;
+  showTopBar?: boolean;
   showSkip?: boolean;
   onSkip?: () => void;
   skipLabel?: string;
   isChangePin?: boolean;
 }
 
-export function SetUpPin({
-  headerTitle,
-  createTitle = "Enter new PIN",
-  confirmTitle = "Confirm your PIN",
-  createSubtitle = "Create a 4-digit PIN to secure transactions, deletions, and data.",
-  confirmSubtitle = "Re-enter the 4-digit PIN to confirm your security code.",
-  onSuccess,
-  onBack,
-  showBack = true,
-  showSkip = false,
-  onSkip,
-  skipLabel = "Set up PIN later",
-  isChangePin = false,
-}: SetUpPinProps) {
-  const [step, setStep] = useState<"CREATE" | "CONFIRM">("CREATE");
-  const [createdPin, setCreatedPin] = useState("");
-  const [currentPin, setCurrentPin] = useState("");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+type PinStep = "CURRENT" | "CREATE" | "CONFIRM";
 
-  const [bioModalVisible, setBioModalVisible] = useState(false);
-  const [bioCapability, setBioCapability] = useState<BiometricCapability>({
-    isAvailable: false,
-    type: null,
-    label: "None",
-  });
-  const [saving, setSaving] = useState(false);
+export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
+  function SetUpPin(
+    {
+      headerTitle,
+      createTitle = "Create PIN",
+      confirmTitle = "Confirm PIN",
+      createSubtitle = "Enter your secure four-digit code",
+      confirmSubtitle = "Re-enter your four-digit code",
+      onSuccess,
+      onBack,
+      showBack = true,
+      showTopBar = true,
+      showSkip = false,
+      onSkip,
+      skipLabel = "Set up PIN later",
+      isChangePin = false,
+    },
+    ref
+  ) {
+    const { settings } = useAuth();
+    const hasExistingPin = Boolean(isChangePin && settings?.pin);
 
-  useEffect(() => {
-    async function checkBio() {
-      const cap = await getBiometricCapability();
-      setBioCapability(cap);
-    }
-    checkBio();
-  }, []);
+    const [step, setStep] = useState<PinStep>(
+      hasExistingPin ? "CURRENT" : "CREATE"
+    );
+    const [createdPin, setCreatedPin] = useState("");
+    const [currentPin, setCurrentPin] = useState("");
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [saving, setSaving] = useState(false);
 
-  function handleKeyPress(num: string) {
-    if (currentPin.length >= 4) return;
-    setErrorMsg(null);
-
-    const next = currentPin + num;
-    setCurrentPin(next);
-
-    if (next.length === 4) {
-      if (step === "CREATE") {
-        setTimeout(() => {
-          setCreatedPin(next);
+    useImperativeHandle(ref, () => ({
+      handleBack: () => {
+        if (isSubmitting || saving) return true;
+        setErrorMsg(null);
+        if (step === "CONFIRM") {
+          setStep("CREATE");
           setCurrentPin("");
-          setStep("CONFIRM");
-        }, 180);
-      } else {
-        // Step === "CONFIRM"
-        if (next === createdPin) {
-          // PIN matched
-          if (bioCapability.isAvailable && !isChangePin) {
-            setBioModalVisible(true);
+          setCreatedPin("");
+          return true;
+        }
+        if (step === "CREATE" && hasExistingPin) {
+          setStep("CURRENT");
+          setCurrentPin("");
+          return true;
+        }
+        return false;
+      },
+    }));
+
+    function handleKeyPress(num: string) {
+      if (isSubmitting || saving || currentPin.length >= 4) return;
+      setErrorMsg(null);
+
+      const next = currentPin + num;
+      setCurrentPin(next);
+
+      if (next.length === 4) {
+        if (step === "CURRENT") {
+          if (settings?.pin && next === settings.pin) {
+            setIsSubmitting(true);
+            setTimeout(() => {
+              setStep("CREATE");
+              setCurrentPin("");
+              setIsSubmitting(false);
+            }, 180);
           } else {
-            finalizePin(next, false);
+            if (Platform.OS !== "web") {
+              Vibration.vibrate(150);
+            }
+            setErrorMsg("Incorrect current PIN. Please try again.");
+            setTimeout(() => {
+              setCurrentPin("");
+            }, 350);
           }
-        } else {
-          // Mismatch
-          if (Platform.OS !== "web") {
-            Vibration.vibrate(150);
-          }
-          setErrorMsg("PINs do not match. Please start again.");
+        } else if (step === "CREATE") {
+          setIsSubmitting(true);
           setTimeout(() => {
-            setCreatedPin("");
+            setCreatedPin(next);
             setCurrentPin("");
-            setStep("CREATE");
-          }, 350);
+            setStep("CONFIRM");
+            setIsSubmitting(false);
+          }, 180);
+        } else {
+          // Step === "CONFIRM"
+          if (next === createdPin) {
+            setIsSubmitting(true);
+            setTimeout(() => {
+              finalizePin(next, false);
+            }, 150);
+          } else {
+            if (Platform.OS !== "web") {
+              Vibration.vibrate(150);
+            }
+            setErrorMsg("PINs do not match. Please start again.");
+            setTimeout(() => {
+              setCreatedPin("");
+              setCurrentPin("");
+              setStep("CREATE");
+            }, 350);
+          }
         }
       }
     }
-  }
 
-  function handleDeletePress() {
-    setErrorMsg(null);
-    if (currentPin.length > 0) {
-      setCurrentPin((prev) => prev.slice(0, -1));
-    }
-  }
-
-  async function finalizePin(pinToSave: string, enableBio: boolean) {
-    try {
-      setSaving(true);
+    function handleDeletePress() {
+      if (isSubmitting || saving) return;
       setErrorMsg(null);
-      await onSuccess(pinToSave, enableBio);
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to save PIN.");
-    } finally {
-      setSaving(false);
+      if (currentPin.length > 0) {
+        setCurrentPin((prev) => prev.slice(0, -1));
+      }
     }
-  }
 
-  async function handleEnableBiometrics() {
-    setBioModalVisible(false);
-    const testResult = await authenticateWithBiometrics(
-      `Authenticate with ${bioCapability.label} to enable`
-    );
-    finalizePin(createdPin, testResult.success);
-  }
-
-  function handleSkipBiometrics() {
-    setBioModalVisible(false);
-    finalizePin(createdPin, false);
-  }
-
-  function handleBackAction() {
-    if (step === "CONFIRM") {
-      setStep("CREATE");
-      setCurrentPin("");
-      setCreatedPin("");
-    } else if (onBack) {
-      onBack();
+    async function finalizePin(pinToSave: string, enableBio: boolean) {
+      try {
+        setSaving(true);
+        setErrorMsg(null);
+        await onSuccess(pinToSave, enableBio);
+      } catch (err: any) {
+        setErrorMsg(err?.message || "Failed to save PIN.");
+        setIsSubmitting(false);
+        setSaving(false);
+      }
     }
-  }
 
-  return (
-    <SafeAreaView className="flex-1 bg-dark-bg justify-between px-6 pt-4 pb-8">
-      {/* Top Bar */}
-      <View className="flex-row items-center justify-between">
-        {showBack ? (
-          <TouchableOpacity
-            onPress={handleBackAction}
-            className="w-10 h-10 rounded-full items-center justify-center -ml-2"
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
-          </TouchableOpacity>
-        ) : (
-          <View className="w-10" />
-        )}
+    function handleBackAction() {
+      if (isSubmitting || saving) return;
+      setErrorMsg(null);
+      if (step === "CONFIRM") {
+        setStep("CREATE");
+        setCurrentPin("");
+        setCreatedPin("");
+      } else if (step === "CREATE" && hasExistingPin) {
+        setStep("CURRENT");
+        setCurrentPin("");
+      } else if (onBack) {
+        onBack();
+      }
+    }
 
-        {headerTitle ? (
-          <Text className="text-dark-muted text-xs font-semibold uppercase tracking-widest">
-            {headerTitle}
-          </Text>
-        ) : (
-          <View className="w-10" />
-        )}
-        <View className="w-10" />
-      </View>
+    let displayTitle = "";
+    let displaySubtitle = "";
 
-      {/* Main Content: Title, Subtitle & PIN Indicators */}
-      <View className="items-center px-4">
-        <Text className="text-dark-text text-2xl font-bold tracking-tight text-center mb-2">
-          {step === "CREATE" ? createTitle : confirmTitle}
-        </Text>
+    if (step === "CURRENT") {
+      displayTitle = "Current PIN";
+      displaySubtitle = "Enter your current four-digit code";
+    } else if (step === "CREATE") {
+      displayTitle = createTitle;
+      displaySubtitle = createSubtitle;
+    } else {
+      displayTitle = confirmTitle;
+      displaySubtitle = confirmSubtitle;
+    }
 
-        <Text className="text-dark-muted text-xs text-center max-w-[280px] leading-relaxed mb-8">
-          {step === "CREATE" ? createSubtitle : confirmSubtitle}
-        </Text>
+    const isPadDisabled = isSubmitting || saving;
 
-        {/* 4 PIN Indicator Boxes */}
-        <View className="flex-row items-center justify-center gap-4 mb-4">
-          {[0, 1, 2, 3].map((index) => {
-            const isFilled = currentPin.length > index;
-            return (
-              <View
-                key={index}
-                className={`w-14 h-14 rounded-2xl items-center justify-center border-2 ${
-                  isFilled
-                    ? "border-brand-accent bg-brand-accent/15"
-                    : "border-dark-border bg-dark-surface"
-                }`}
+    const Content = (
+      <View className="flex-1 bg-dark-bg justify-between px-6 pt-4 pb-8">
+        {/* Optional Top Bar if showTopBar is true */}
+        {showTopBar ? (
+          <View className="flex-row items-center justify-between">
+            {showBack ? (
+              <TouchableOpacity
+                onPress={handleBackAction}
+                disabled={isPadDisabled}
+                delayPressIn={0}
+                className="w-10 h-10 rounded-full items-center justify-center -ml-2"
+                activeOpacity={0.7}
               >
-                {isFilled && (
-                  <View className="w-3.5 h-3.5 rounded-full bg-brand-accent" />
-                )}
-              </View>
-            );
-          })}
-        </View>
-
-        {errorMsg ? (
-          <Text className="text-brand-expense text-xs font-semibold text-center mt-2">
-            {errorMsg}
-          </Text>
-        ) : (
-          <View className="h-6" />
-        )}
-      </View>
-
-      {/* Keypad */}
-      <View className="w-full max-w-xs mx-auto gap-3">
-        <View className="flex-row justify-between">
-          {["1", "2", "3"].map((digit) => (
-            <KeypadButton
-              key={digit}
-              value={digit}
-              onPress={() => handleKeyPress(digit)}
-            />
-          ))}
-        </View>
-
-        <View className="flex-row justify-between">
-          {["4", "5", "6"].map((digit) => (
-            <KeypadButton
-              key={digit}
-              value={digit}
-              onPress={() => handleKeyPress(digit)}
-            />
-          ))}
-        </View>
-
-        <View className="flex-row justify-between">
-          {["7", "8", "9"].map((digit) => (
-            <KeypadButton
-              key={digit}
-              value={digit}
-              onPress={() => handleKeyPress(digit)}
-            />
-          ))}
-        </View>
-
-        <View className="flex-row justify-between items-center">
-          <View className="w-20 h-16 items-center justify-center">
-            {bioCapability.isAvailable && (
-              <Ionicons
-                name={
-                  bioCapability.type === "FACE_ID"
-                    ? "scan-outline"
-                    : "finger-print"
-                }
-                size={26}
-                color="#60677C"
-              />
+                <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
+              </TouchableOpacity>
+            ) : (
+              <View className="w-10" />
             )}
+
+            {headerTitle ? (
+              <Text className="text-dark-muted text-xs font-semibold uppercase tracking-widest">
+                {headerTitle}
+              </Text>
+            ) : (
+              <View className="w-10" />
+            )}
+            <View className="w-10" />
+          </View>
+        ) : null}
+
+        {/* Main Content: Title, Subtitle & 4 Circular Minimal Indicators */}
+        <View className="items-center px-4">
+          <Text className="text-dark-text text-2xl font-bold tracking-tight text-center mb-2">
+            {displayTitle}
+          </Text>
+
+          <Text className="text-dark-muted text-xs text-center max-w-[280px] leading-relaxed mb-8">
+            {displaySubtitle}
+          </Text>
+
+          {/* 4 Minimal Circular PIN Placeholders */}
+          <View className="flex-row items-center justify-center gap-4 mb-4">
+            {[0, 1, 2, 3].map((index) => {
+              const isFilled = currentPin.length > index;
+              return (
+                <View
+                  key={index}
+                  className="w-14 h-14 rounded-full bg-dark-surface items-center justify-center"
+                >
+                  {isFilled && (
+                    <View className="w-6 h-6 rounded-full bg-brand-accent" />
+                  )}
+                </View>
+              );
+            })}
           </View>
 
-          <KeypadButton value="0" onPress={() => handleKeyPress("0")} />
-
-          <TouchableOpacity
-            onPress={handleDeletePress}
-            className="w-20 h-16 rounded-2xl items-center justify-center active:bg-dark-surface"
-            activeOpacity={0.7}
-          >
-            <Ionicons name="backspace-outline" size={26} color="#94A3B8" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Footer / Skip Link */}
-      <View className="items-center pt-2">
-        {showSkip && (
-          <TouchableOpacity
-            onPress={onSkip}
-            className="py-2 px-4"
-            activeOpacity={0.7}
-          >
-            <Text className="text-dark-muted text-xs font-medium">
-              {skipLabel}
+          {errorMsg ? (
+            <Text className="text-brand-expense text-xs font-semibold text-center mt-2">
+              {errorMsg}
             </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Loading Overlay */}
-      {saving && (
-        <View className="absolute inset-0 bg-black/60 items-center justify-center">
-          <ActivityIndicator size="large" color="#D4F938" />
+          ) : (
+            <View className="h-6" />
+          )}
         </View>
-      )}
 
-      {/* Enable Biometrics Prompt Modal */}
-      <HawkModal visible={bioModalVisible} transparent={true} animationType="fade">
-        <View className="flex-1 bg-black/80 items-center justify-center px-6">
-          <View className="w-full max-w-sm bg-dark-surface border border-dark-border rounded-3xl p-6 items-center shadow-2xl">
-            <View className="w-16 h-16 rounded-full bg-brand-accent/15 border border-brand-accent/40 items-center justify-center mb-4">
-              <Ionicons
-                name={
-                  bioCapability.type === "FACE_ID"
-                    ? "scan-outline"
-                    : "finger-print"
-                }
-                size={34}
-                color="#D4F938"
+        {/* Circular Keypad */}
+        <View className="w-full max-w-[280px] mx-auto gap-4">
+          <View className="flex-row justify-between">
+            {["1", "2", "3"].map((digit) => (
+              <KeypadButton
+                key={digit}
+                value={digit}
+                onPress={() => handleKeyPress(digit)}
+                disabled={isPadDisabled}
               />
-            </View>
+            ))}
+          </View>
 
-            <Text className="text-dark-text text-xl font-bold text-center mb-2">
-              Enable {bioCapability.label}?
-            </Text>
+          <View className="flex-row justify-between">
+            {["4", "5", "6"].map((digit) => (
+              <KeypadButton
+                key={digit}
+                value={digit}
+                onPress={() => handleKeyPress(digit)}
+                disabled={isPadDisabled}
+              />
+            ))}
+          </View>
 
-            <Text className="text-dark-muted text-xs text-center leading-relaxed mb-6 px-3">
-              Use {bioCapability.label} for effortless unlocking and instant
-              verification when deleting assets or retrieving backups.
-            </Text>
+          <View className="flex-row justify-between">
+            {["7", "8", "9"].map((digit) => (
+              <KeypadButton
+                key={digit}
+                value={digit}
+                onPress={() => handleKeyPress(digit)}
+                disabled={isPadDisabled}
+              />
+            ))}
+          </View>
+
+          <View className="flex-row justify-between items-center">
+            <View className="w-[72px] h-[72px]" />
+
+            <KeypadButton
+              value="0"
+              onPress={() => handleKeyPress("0")}
+              disabled={isPadDisabled}
+            />
 
             <TouchableOpacity
-              onPress={handleEnableBiometrics}
-              className="w-full py-4 rounded-full bg-brand-accent items-center justify-center mb-3 shadow-lg active:opacity-90"
-              activeOpacity={0.8}
+              onPress={handleDeletePress}
+              disabled={isPadDisabled}
+              delayPressIn={0}
+              className="w-[72px] h-[72px] rounded-full bg-dark-surface border border-dark-border/40 items-center justify-center active:bg-dark-card"
+              activeOpacity={0.6}
             >
-              <Text className="text-dark-bg font-bold text-sm tracking-wide">
-                Enable {bioCapability.label}
-              </Text>
+              <Ionicons name="backspace-outline" size={24} color="#F8FAFC" />
             </TouchableOpacity>
+          </View>
+        </View>
 
+        {/* Footer / Skip Link */}
+        <View className="items-center pt-2">
+          {showSkip && (
             <TouchableOpacity
-              onPress={handleSkipBiometrics}
-              className="py-2.5 px-6 items-center justify-center"
+              onPress={onSkip}
+              disabled={isPadDisabled}
+              className="py-2 px-4"
               activeOpacity={0.7}
             >
-              <Text className="text-dark-muted font-medium text-xs">
-                Use PIN Only
+              <Text className="text-dark-muted text-xs font-medium">
+                {skipLabel}
               </Text>
             </TouchableOpacity>
-          </View>
+          )}
         </View>
-      </HawkModal>
-    </SafeAreaView>
-  );
-}
+      </View>
+    );
+
+    if (showTopBar) {
+      return (
+        <SafeAreaView className="flex-1 bg-dark-bg justify-between">
+          {Content}
+        </SafeAreaView>
+      );
+    }
+
+    return Content;
+  }
+);
 
 function KeypadButton({
   value,
   onPress,
+  disabled,
 }: {
   value: string;
   onPress: () => void;
+  disabled?: boolean;
 }) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="w-20 h-16 rounded-2xl items-center justify-center bg-dark-surface/80 border border-dark-border/40 active:bg-brand-accent/20 active:border-brand-accent/40"
+      disabled={disabled}
+      delayPressIn={0}
+      className="w-[72px] h-[72px] rounded-full items-center justify-center bg-dark-surface border border-dark-border/40 active:bg-dark-card active:border-brand-accent/40"
       activeOpacity={0.6}
     >
       <Text className="text-dark-text text-2xl font-bold">{value}</Text>
