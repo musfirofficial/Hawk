@@ -1,14 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { forwardRef, useImperativeHandle, useState } from "react";
 import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import {
+  KeyboardAvoidingView,
   Platform,
   Text,
+  TextInput,
   TouchableOpacity,
   Vibration,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../context/auth";
+import { BiometricAuthType } from "../services/biometrics";
+import { HawkModal } from "./HawkModal";
 
 export interface SetUpPinHandle {
   handleBack: () => boolean;
@@ -20,6 +30,8 @@ export interface SetUpPinProps {
   confirmTitle?: string;
   createSubtitle?: string;
   confirmSubtitle?: string;
+  verifyTitle?: string;
+  verifySubtitle?: string;
   onSuccess: (pin: string, enableBiometrics: boolean) => void | Promise<void>;
   onBack?: () => void;
   showBack?: boolean;
@@ -28,18 +40,25 @@ export interface SetUpPinProps {
   onSkip?: () => void;
   skipLabel?: string;
   isChangePin?: boolean;
+  showResetPin?: boolean;
+  mode?: "setup" | "verify";
+  showBiometric?: boolean;
+  biometricType?: BiometricAuthType;
+  onBiometricPress?: () => void;
+  onVerify?: (pin: string) => boolean | Promise<boolean>;
 }
 
-type PinStep = "CURRENT" | "CREATE" | "CONFIRM";
+type PinStep = "CURRENT" | "CREATE" | "CONFIRM" | "VERIFY";
 
 export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
   function SetUpPin(
     {
-      headerTitle,
       createTitle = "Create PIN",
       confirmTitle = "Confirm PIN",
       createSubtitle = "Enter your secure four-digit code",
       confirmSubtitle = "Re-enter your four-digit code",
+      verifyTitle = "Enter PIN",
+      verifySubtitle = "Enter your 4-digit security PIN",
       onSuccess,
       onBack,
       showBack = true,
@@ -48,20 +67,101 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
       onSkip,
       skipLabel = "Set up PIN later",
       isChangePin = false,
+      showResetPin = isChangePin,
+      mode = "setup",
+      showBiometric = false,
+      biometricType = null,
+      onBiometricPress,
+      onVerify,
     },
-    ref
+    ref,
   ) {
     const { settings } = useAuth();
     const hasExistingPin = Boolean(isChangePin && settings?.pin);
 
     const [step, setStep] = useState<PinStep>(
-      hasExistingPin ? "CURRENT" : "CREATE"
+      mode === "verify" ? "VERIFY" : hasExistingPin ? "CURRENT" : "CREATE",
     );
     const [createdPin, setCreatedPin] = useState("");
     const [currentPin, setCurrentPin] = useState("");
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [isResetMode, setIsResetMode] = useState(false);
+
+    // Reset PIN Modal state
+    const [isResetModalVisible, setIsResetModalVisible] = useState(false);
+    const [resetCode, setResetCode] = useState("");
+    const [resetError, setResetError] = useState<string | null>(null);
+    const [isResetSuccess, setIsResetSuccess] = useState(false);
+    const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+      return () => {
+        if (resetTimerRef.current) {
+          clearTimeout(resetTimerRef.current);
+        }
+      };
+    }, []);
+
+    function handleCodeChange(val: string) {
+      if (isResetSuccess) return;
+      const cleaned = val
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 8);
+      if (cleaned.length > 4) {
+        setResetCode(`${cleaned.slice(0, 4)}-${cleaned.slice(4)}`);
+      } else {
+        setResetCode(cleaned);
+      }
+      setResetError(null);
+    }
+
+    function handleVerifyResetCode() {
+      if (isResetSuccess) return;
+      const cleanedInput = resetCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const cleanedStored = (settings?.recoveryKey || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "");
+
+      if (cleanedInput.length < 8) {
+        setResetError("Please enter the complete 8-character code.");
+        return;
+      }
+
+      if (cleanedStored && cleanedInput === cleanedStored) {
+        setIsResetSuccess(true);
+        setResetError(null);
+
+        resetTimerRef.current = setTimeout(() => {
+          setIsResetModalVisible(false);
+          setIsResetMode(true);
+          setStep("CREATE");
+          setCurrentPin("");
+          setCreatedPin("");
+          setErrorMsg(null);
+          setResetCode("");
+          setIsResetSuccess(false);
+        }, 1000);
+      } else {
+        if (Platform.OS !== "web") {
+          Vibration.vibrate(150);
+        }
+        setResetError("Incorrect recovery code. Please try again.");
+      }
+    }
+
+    function handleCloseResetModal() {
+      if (isResetSuccess) return;
+      if (resetTimerRef.current) {
+        clearTimeout(resetTimerRef.current);
+      }
+      setIsResetModalVisible(false);
+      setResetCode("");
+      setResetError(null);
+      setIsResetSuccess(false);
+    }
 
     useImperativeHandle(ref, () => ({
       handleBack: () => {
@@ -74,8 +174,16 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
           return true;
         }
         if (step === "CREATE" && hasExistingPin) {
+          if (isResetMode) {
+            if (onBack) onBack();
+            return true;
+          }
           setStep("CURRENT");
           setCurrentPin("");
+          return true;
+        }
+        if (step === "VERIFY" && onBack) {
+          onBack();
           return true;
         }
         return false;
@@ -90,7 +198,38 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
       setCurrentPin(next);
 
       if (next.length === 4) {
-        if (step === "CURRENT") {
+        if (step === "VERIFY") {
+          setIsSubmitting(true);
+          (async () => {
+            try {
+              let isValid = false;
+              if (onVerify) {
+                isValid = await onVerify(next);
+              } else {
+                isValid = Boolean(settings?.pin && next === settings.pin);
+              }
+
+              if (isValid) {
+                setTimeout(() => {
+                  onSuccess(next, false);
+                }, 150);
+              } else {
+                if (Platform.OS !== "web") {
+                  Vibration.vibrate(150);
+                }
+                setErrorMsg("Incorrect PIN. Please try again.");
+                setTimeout(() => {
+                  setCurrentPin("");
+                  setIsSubmitting(false);
+                }, 350);
+              }
+            } catch (err: any) {
+              setErrorMsg(err?.message || "Verification failed");
+              setCurrentPin("");
+              setIsSubmitting(false);
+            }
+          })();
+        } else if (step === "CURRENT") {
           if (settings?.pin && next === settings.pin) {
             setIsSubmitting(true);
             setTimeout(() => {
@@ -165,6 +304,10 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
         setCurrentPin("");
         setCreatedPin("");
       } else if (step === "CREATE" && hasExistingPin) {
+        if (isResetMode) {
+          if (onBack) onBack();
+          return;
+        }
         setStep("CURRENT");
         setCurrentPin("");
       } else if (onBack) {
@@ -175,7 +318,10 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
     let displayTitle = "";
     let displaySubtitle = "";
 
-    if (step === "CURRENT") {
+    if (step === "VERIFY") {
+      displayTitle = verifyTitle;
+      displaySubtitle = verifySubtitle;
+    } else if (step === "CURRENT") {
       displayTitle = "Current PIN";
       displaySubtitle = "Enter your current four-digit code";
     } else if (step === "CREATE") {
@@ -207,13 +353,6 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
               <View className="w-10" />
             )}
 
-            {headerTitle ? (
-              <Text className="text-dark-muted text-xs font-semibold uppercase tracking-widest">
-                {headerTitle}
-              </Text>
-            ) : (
-              <View className="w-10" />
-            )}
             <View className="w-10" />
           </View>
         ) : null}
@@ -290,7 +429,27 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
           </View>
 
           <View className="flex-row justify-between items-center">
-            <View className="w-[72px] h-[72px]" />
+            {mode === "verify" && showBiometric && onBiometricPress ? (
+              <TouchableOpacity
+                onPress={onBiometricPress}
+                disabled={isPadDisabled}
+                delayPressIn={0}
+                className="w-[72px] h-[72px] rounded-full bg-dark-surface border border-dark-border/40 items-center justify-center active:bg-dark-card"
+                activeOpacity={0.6}
+              >
+                <Ionicons
+                  name={
+                    biometricType === "FACE_ID"
+                      ? "scan-outline"
+                      : "finger-print-outline"
+                  }
+                  size={26}
+                  color="#F8FAFC"
+                />
+              </TouchableOpacity>
+            ) : (
+              <View className="w-[72px] h-[72px]" />
+            )}
 
             <KeypadButton
               value="0"
@@ -310,8 +469,8 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
           </View>
         </View>
 
-        {/* Footer / Skip Link */}
-        <View className="items-center pt-2">
+        {/* Footer / Skip or Reset PIN Link */}
+        <View className="items-center pt-2 min-h-[44px] justify-center">
           {showSkip && (
             <TouchableOpacity
               onPress={onSkip}
@@ -324,7 +483,133 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
               </Text>
             </TouchableOpacity>
           )}
+
+          {showResetPin && step === "CURRENT" && (
+            <TouchableOpacity
+              onPress={() => {
+                setResetCode("");
+                setResetError(null);
+                setIsResetSuccess(false);
+                setIsResetModalVisible(true);
+              }}
+              delayPressIn={0}
+              hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}
+              className="py-2.5 px-4"
+              activeOpacity={0.7}
+            >
+              <Text className="text-dark-muted active:text-dark-text text-sm font-medium underline">
+                Reset PIN
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* Reset PIN Modal with strong blur / opaque overlay */}
+        <HawkModal
+          visible={isResetModalVisible}
+          animationType="fade"
+          onRequestClose={handleCloseResetModal}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            className="flex-1 justify-center items-center px-6"
+            style={[
+              { backgroundColor: "rgba(7, 9, 14, 0.95)" },
+              Platform.OS === "web"
+                ? ({
+                    backdropFilter: "blur(24px)",
+                    WebkitBackdropFilter: "blur(24px)",
+                  } as any)
+                : null,
+            ]}
+          >
+            <View className="w-full max-w-sm bg-dark-surface border border-dark-border/80 rounded-3xl p-6 items-center shadow-2xl">
+              <Text className="text-dark-text text-xl font-bold tracking-tight text-center mb-2">
+                Reset PIN
+              </Text>
+
+              <Text className="text-dark-muted text-xs text-center leading-relaxed mb-6 px-2">
+                Enter your 8-character recovery code to reset your security PIN.
+              </Text>
+
+              <View className="w-full mb-2">
+                <TextInput
+                  value={resetCode}
+                  onChangeText={handleCodeChange}
+                  editable={!isResetSuccess}
+                  placeholder="XXXX-XXXX"
+                  placeholderTextColor="#475569"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={9}
+                  className={`w-full bg-dark-bg border ${
+                    isResetSuccess
+                      ? "border-emerald-500/60 text-emerald-400"
+                      : "border-dark-border text-dark-text"
+                  } rounded-2xl py-3 px-4 text-center text-2xl font-bold tracking-widest font-mono`}
+                  returnKeyType="done"
+                  onSubmitEditing={handleVerifyResetCode}
+                />
+              </View>
+
+              {isResetSuccess ? (
+                <View className="flex-row items-center justify-center gap-1.5 mb-4">
+                  <Ionicons name="checkmark-circle" size={16} color="#4ADE80" />
+                  <Text className="text-[#4ADE80] text-xs font-semibold text-center">
+                    Recovery code verified! Redirecting...
+                  </Text>
+                </View>
+              ) : resetError ? (
+                <Text className="text-brand-expense text-xs font-semibold text-center mb-4">
+                  {resetError}
+                </Text>
+              ) : (
+                <View className="h-4" />
+              )}
+
+              {isResetSuccess ? (
+                <View className="w-full py-4 rounded-full items-center justify-center mb-2 shadow-lg bg-[#4ADE80] flex-row gap-2">
+                  <Ionicons name="checkmark" size={18} color="#0B0D12" />
+                  <Text className="font-bold text-base text-dark-bg">
+                    Verified
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={handleVerifyResetCode}
+                  disabled={resetCode.replace(/[^A-Z0-9]/g, "").length < 8}
+                  className={`w-full py-4 rounded-full items-center justify-center mb-2 shadow-lg ${
+                    resetCode.replace(/[^A-Z0-9]/g, "").length === 8
+                      ? "bg-brand-accent active:opacity-90"
+                      : "bg-dark-border/40 opacity-50"
+                  }`}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    className={`font-bold text-base ${
+                      resetCode.replace(/[^A-Z0-9]/g, "").length === 8
+                        ? "text-dark-bg"
+                        : "text-dark-muted"
+                    }`}
+                  >
+                    Verify Code
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                onPress={handleCloseResetModal}
+                disabled={isResetSuccess}
+                className={`w-full py-2.5 items-center ${isResetSuccess ? "opacity-30" : ""}`}
+                activeOpacity={0.7}
+              >
+                <Text className="text-dark-muted text-sm font-semibold">
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </HawkModal>
       </View>
     );
 
@@ -337,7 +622,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
     }
 
     return Content;
-  }
+  },
 );
 
 function KeypadButton({

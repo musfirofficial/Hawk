@@ -145,7 +145,7 @@ export default function RecoveryKeyScreen() {
 
         {/* Bottom Actions: Enable Biometrics / Continue & Set Up Later */}
         <View className="w-full pt-8">
-          {bioCapability.isAvailable ? (
+          {bioCapability.isAvailable && !settings?.biometricsEnabled ? (
             <>
               {/* Main Button: Enable Biometrics with matching Icon */}
               <TouchableOpacity

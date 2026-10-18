@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { addDatabaseChangeListener } from "expo-sqlite";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   ScrollView,
   Text,
   TextInput,
@@ -9,38 +10,32 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { BudgetDetailCard } from "../../components/budget/BudgetDetailCard";
+import { BudgetHeroPie } from "../../components/budget/BudgetHeroPie";
+import { Calendar, formatDisplayMonth } from "../../components/calendar";
 import { HawkFlyUp } from "../../components/HawkFlyUp";
+import { useAlert } from "../../context/alert";
 import { useAuth } from "../../context/auth";
-import { useTransactions } from "../../context/transactions";
-import { db, ensureDatabaseInitialized, expoDb } from "../../db";
-import * as schema from "../../db/schema";
+import { useCategories } from "../../context/categories";
+import {
+  addCategoryToExistingBudget,
+  copyMonthBudgets,
+  getAssignedCategoryIdsForMonth,
+  getMonthBudgetSummary,
+  getPreviousMonthYMD,
+  getSavedTemplateMonths,
+  MonthBudgetSummary,
+  MonthSummaryItem,
+} from "../../services/budgetService";
 import { formatCurrency, getCurrencySymbol } from "../../services/currency";
 
-interface BudgetItem {
-  id: number;
-  categoryId: number;
-  categoryName: string;
-  categoryIcon: string | null;
-  amount: number;
-  period: string;
-}
-
 export default function BudgetScreen() {
+  const router = useRouter();
   const { settings } = useAuth();
-  const { categories, transactions } = useTransactions();
+  const { categories } = useCategories();
+  const { showAlert, showConfirm } = useAlert();
 
-  const [budgets, setBudgets] = useState<BudgetItem[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedBudget, setSelectedBudget] = useState<BudgetItem | null>(null);
-
-  // Form state for creating/editing budget
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
-    null
-  );
-  const [amountInput, setAmountInput] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
-
-  // Current month string 'YYYY-MM'
+  // Selected Month 'YYYY-MM'
   const currentMonthYMD = useMemo(() => {
     const now = new Date();
     const y = now.getFullYear();
@@ -48,501 +43,485 @@ export default function BudgetScreen() {
     return `${y}-${m}`;
   }, []);
 
-  const monthLabel = useMemo(() => {
-    const now = new Date();
-    return now.toLocaleString("default", { month: "long", year: "numeric" });
-  }, []);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthYMD);
+  const [tempSelectedMonth, setTempSelectedMonth] = useState(currentMonthYMD);
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
 
-  const loadBudgets = useCallback(() => {
+  // Import template flyup state
+  const [isImportFlyUpOpen, setIsImportFlyUpOpen] = useState(false);
+  const [savedTemplates, setSavedTemplates] = useState<MonthSummaryItem[]>([]);
+  const [prevMonthSummary, setPrevMonthSummary] =
+    useState<MonthBudgetSummary | null>(null);
+
+  // Budget summary data for selected month
+  const [summary, setSummary] = useState<MonthBudgetSummary>({
+    month: currentMonthYMD,
+    totalBudget: 0,
+    totalSpent: 0,
+    totalRemaining: 0,
+    overallProgressPercent: 0,
+    budgets: [],
+    topCategories: [],
+  });
+
+  // Add Category to existing budget modal state
+  const [addCatBudgetId, setAddCatBudgetId] = useState<number | null>(null);
+  const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
+  const [addCatAmount, setAddCatAmount] = useState("");
+  const [addCatError, setAddCatError] = useState<string | null>(null);
+
+  const loadData = useCallback(() => {
     try {
-      ensureDatabaseInitialized();
-      const rows = expoDb.getAllSync<{
-        id: number;
-        category_id: number;
-        amount: number;
-        period: string;
-        category_name: string;
-        category_icon: string | null;
-      }>(`
-        SELECT b.id, b.category_id, b.amount, b.period, c.name as category_name, c.icon as category_icon
-        FROM budgets b
-        JOIN categories c ON c.id = b.category_id
-        ORDER BY b.amount DESC;
-      `);
-
-      const mapped: BudgetItem[] = rows.map((r) => ({
-        id: r.id,
-        categoryId: r.category_id,
-        categoryName: r.category_name,
-        categoryIcon: r.category_icon,
-        amount: Number(r.amount) || 0,
-        period: r.period,
-      }));
-      setBudgets(mapped);
+      const data = getMonthBudgetSummary(selectedMonth);
+      setSummary(data);
     } catch (err) {
-      console.warn("Failed to load budgets:", err);
+      console.warn("Failed to load budget summary:", err);
     }
-  }, []);
+  }, [selectedMonth]);
 
+  // Load whenever screen focuses or month changes
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
+
+  // Real-time listener on SQLite database changes
   useEffect(() => {
-    loadBudgets();
-  }, [loadBudgets]);
+    let sub: { remove: () => void } | undefined;
+    try {
+      sub = addDatabaseChangeListener(() => {
+        loadData();
+      });
+    } catch {}
+    return () => {
+      sub?.remove();
+    };
+  }, [loadData]);
 
-  // Calculate spent per category for current month
-  const categorySpentMap = useMemo(() => {
-    const map = new Map<number, number>();
-    for (const t of transactions) {
-      if (
-        t.type === "EXPENSE" &&
-        t.categoryId &&
-        t.date &&
-        t.date.startsWith(currentMonthYMD)
-      ) {
-        const cur = map.get(t.categoryId) || 0;
-        map.set(t.categoryId, cur + t.amount);
-      }
-    }
-    return map;
-  }, [transactions, currentMonthYMD]);
+  const monthLabel = useMemo(() => {
+    return formatDisplayMonth(`${selectedMonth}-01`);
+  }, [selectedMonth]);
 
-  // Overall totals
-  const totalBudgetAmount = useMemo(() => {
-    return budgets.reduce((acc, b) => acc + b.amount, 0);
-  }, [budgets]);
-
-  const totalSpentAmount = useMemo(() => {
-    return budgets.reduce((acc, b) => {
-      const spent = categorySpentMap.get(b.categoryId) || 0;
-      return acc + spent;
-    }, 0);
-  }, [budgets, categorySpentMap]);
-
-  const overallPct = useMemo(() => {
-    if (totalBudgetAmount <= 0) return 0;
-    return Math.min(
-      100,
-      Math.round((totalSpentAmount / totalBudgetAmount) * 100)
+  // Expense categories available to add into the target budget
+  const availableCategoriesForBudget = useMemo(() => {
+    if (!addCatBudgetId) return [];
+    const targetBudget = summary.budgets.find((b) => b.id === addCatBudgetId);
+    const existingInTargetIds = new Set(
+      targetBudget ? targetBudget.categories.map((c) => c.categoryId) : [],
     );
-  }, [totalSpentAmount, totalBudgetAmount]);
+    const assignedToOtherBudgetsIds = new Set(
+      getAssignedCategoryIdsForMonth(selectedMonth, addCatBudgetId),
+    );
+    return categories.filter(
+      (c) =>
+        c.type === "EXPENSE" &&
+        !existingInTargetIds.has(c.id) &&
+        !assignedToOtherBudgetsIds.has(c.id),
+    );
+  }, [addCatBudgetId, categories, selectedMonth, summary.budgets]);
 
-  function handleOpenCreate() {
-    setSelectedBudget(null);
-    // Default to first category not yet budgeted
-    const budgetedCatIds = new Set(budgets.map((b) => b.categoryId));
-    const firstAvailable = categories.find((c) => !budgetedCatIds.has(c.id));
-    setSelectedCategoryId(firstAvailable ? firstAvailable.id : categories[0]?.id || null);
-    setAmountInput("");
-    setFormError(null);
-    setIsModalOpen(true);
+  function handleOpenAddCategory(budgetId: number) {
+    setAddCatBudgetId(budgetId);
+    setSelectedCatId(null);
+    setAddCatAmount("");
+    setAddCatError(null);
   }
 
-  function handleOpenEdit(b: BudgetItem) {
-    setSelectedBudget(b);
-    setSelectedCategoryId(b.categoryId);
-    setAmountInput(String(b.amount));
-    setFormError(null);
-    setIsModalOpen(true);
-  }
-
-  function handleSaveBudget() {
-    if (!selectedCategoryId) {
-      setFormError("Please select a category");
+  function handleSaveNewCategory() {
+    if (!addCatBudgetId) return;
+    if (!selectedCatId) {
+      setAddCatError("Please choose a category");
       return;
     }
-    const parsedAmount = parseFloat(amountInput);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      setFormError("Please enter a valid positive amount");
+    const parsed = parseFloat(addCatAmount);
+    if (isNaN(parsed) || parsed <= 0) {
+      setAddCatError("Please enter a valid amount");
       return;
     }
 
     try {
-      ensureDatabaseInitialized();
-      if (selectedBudget) {
-        expoDb.runSync(
-          `UPDATE budgets SET amount = ?, category_id = ? WHERE id = ?;`,
-          [parsedAmount, selectedCategoryId, selectedBudget.id]
-        );
-      } else {
-        // Upsert by category
-        const existing = expoDb.getFirstSync<{ id: number }>(
-          `SELECT id FROM budgets WHERE category_id = ?;`,
-          [selectedCategoryId]
-        );
-        if (existing) {
-          expoDb.runSync(`UPDATE budgets SET amount = ? WHERE id = ?;`, [
-            parsedAmount,
-            existing.id,
-          ]);
-        } else {
-          expoDb.runSync(
-            `INSERT INTO budgets (category_id, amount, period) VALUES (?, ?, 'MONTHLY');`,
-            [selectedCategoryId, parsedAmount]
-          );
-        }
-      }
-      setIsModalOpen(false);
-      loadBudgets();
-    } catch (err) {
-      console.warn("Error saving budget:", err);
-      setFormError("Failed to save budget");
+      addCategoryToExistingBudget(addCatBudgetId, selectedCatId, parsed);
+      setAddCatBudgetId(null);
+      loadData();
+    } catch (err: any) {
+      console.warn("Failed to add category to budget:", err);
+      setAddCatError(
+        err?.message?.includes("UNIQUE")
+          ? "This category is already assigned to a budget this month."
+          : "Failed to add category",
+      );
     }
   }
 
-  function handleDeleteBudget() {
-    if (!selectedBudget) return;
-    Alert.alert(
-      "Delete Budget",
-      `Are you sure you want to remove the budget for ${selectedBudget.categoryName}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            try {
-              ensureDatabaseInitialized();
-              expoDb.runSync(`DELETE FROM budgets WHERE id = ?;`, [
-                selectedBudget.id,
-              ]);
-              setIsModalOpen(false);
-              loadBudgets();
-            } catch (err) {
-              console.warn("Error deleting budget:", err);
-            }
-          },
-        },
-      ]
+  function handleCategoryQuickAdd(categoryId: number) {
+    // Quick record expense transaction with this category
+    router.push({
+      pathname: "/(transaction)/create" as any,
+      params: { categoryId: String(categoryId), type: "EXPENSE" },
+    });
+  }
+
+  function handlePressImport() {
+    if (summary.budgets.length > 0) {
+      showAlert({
+        title: "Budget Already Configured",
+        message:
+          "You already have budgets configured for this month. Templates can only be imported into months without existing budgets.",
+        type: "warning",
+        buttonText: "Got It",
+      });
+      return;
+    }
+
+    // Load previous month summary and saved templates
+    const prevMonth = getPreviousMonthYMD(selectedMonth);
+    const pSummary = getMonthBudgetSummary(prevMonth);
+    setPrevMonthSummary(pSummary);
+
+    const templates = getSavedTemplateMonths().filter(
+      (t) => t.month !== selectedMonth,
     );
+    setSavedTemplates(templates);
+
+    setIsImportFlyUpOpen(true);
+  }
+
+  function handleSelectTemplateToApply(sourceMonth: string) {
+    const sourceLabel = formatDisplayMonth(`${sourceMonth}-01`);
+    const targetLabel = formatDisplayMonth(`${selectedMonth}-01`);
+
+    showConfirm({
+      title: "Apply Budget Template",
+      message: `Apply ${sourceLabel} budgets to ${targetLabel}? This will create all budgets and category allocations for this month.`,
+      type: "info",
+      confirmText: "Apply",
+      cancelText: "Cancel",
+      isDestructive: false,
+      onConfirm: () => {
+        try {
+          copyMonthBudgets(sourceMonth, selectedMonth);
+          setIsImportFlyUpOpen(false);
+          loadData();
+        } catch (err) {
+          console.warn("Failed to apply budget template:", err);
+          showAlert({
+            title: "Error",
+            message: "Failed to apply budget template. Please try again.",
+            type: "danger",
+          });
+        }
+      },
+    });
   }
 
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-dark-bg">
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-5 pt-3 pb-2 border-b border-dark-border/40">
-        <View>
-          <Text className="text-dark-text text-xl font-bold">Budgets</Text>
-          <Text className="text-dark-muted text-xs font-medium mt-0.5">
-            {monthLabel}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          onPress={handleOpenCreate}
-          className="w-10 h-10 rounded-full bg-brand-accent items-center justify-center"
-          activeOpacity={0.8}
-        >
-          <Ionicons name="add" size={24} color="#0B0D12" />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        className="flex-1 px-5 pt-4"
+        contentContainerStyle={{ paddingBottom: 110 }}
+        className="flex-1 px-5 pt-3"
       >
-        {/* Overall Monthly Budget Hero Card */}
-        <View className="bg-dark-surface p-5 rounded-3xl border border-dark-border mb-6">
-          <View className="flex-row items-center justify-between mb-2">
-            <View className="flex-row items-center gap-2">
-              <View className="w-2 h-2 rounded-full bg-brand-accent" />
-              <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider">
-                Monthly Target
-              </Text>
-            </View>
-            <View className="px-2.5 py-0.5 rounded-full bg-dark-card border border-dark-border">
-              <Text className="text-dark-text text-xs font-bold">
-                {overallPct}% spent
-              </Text>
-            </View>
-          </View>
-
-          <Text className="text-dark-text text-3xl font-black tracking-tight my-1">
-            {formatCurrency(
-              totalSpentAmount,
-              settings?.currency,
-              settings?.numberFormat
-            )}
-            <Text className="text-dark-muted text-lg font-normal">
-              {" "}
-              /{" "}
-              {formatCurrency(
-                totalBudgetAmount,
-                settings?.currency,
-                settings?.numberFormat
-              )}
-            </Text>
+        {/* Title at top in scrollable view (centered with more bottom margin) */}
+        <View className="pt-2 pb-5 items-center justify-center">
+          <Text className="text-dark-text text-xl font-bold text-center">
+            Budgets
           </Text>
-
-          {/* Overall Progress Bar */}
-          <View className="h-2.5 w-full bg-dark-card rounded-full overflow-hidden mt-3 mb-2 p-0.5 border border-dark-border/40">
-            <View
-              style={{ width: `${Math.min(100, overallPct)}%` }}
-              className={`h-full rounded-full ${
-                overallPct >= 100
-                  ? "bg-rose-500"
-                  : overallPct >= 80
-                  ? "bg-amber-400"
-                  : "bg-brand-accent"
-              }`}
-            />
-          </View>
-
-          <View className="flex-row items-center justify-between mt-1">
-            <Text className="text-dark-muted text-xs">
-              {totalBudgetAmount >= totalSpentAmount
-                ? `${formatCurrency(
-                    totalBudgetAmount - totalSpentAmount,
-                    settings?.currency,
-                    settings?.numberFormat
-                  )} remaining`
-                : `${formatCurrency(
-                    totalSpentAmount - totalBudgetAmount,
-                    settings?.currency,
-                    settings?.numberFormat
-                  )} over budget`}
-            </Text>
-            <Text className="text-dark-muted text-xs">
-              {budgets.length} {budgets.length === 1 ? "category" : "categories"}
-            </Text>
-          </View>
         </View>
 
-        {/* Category Budgets Section */}
-        <View className="mb-4">
-          <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider">
-              Category Budgets ({budgets.length})
-            </Text>
-            <TouchableOpacity
-              onPress={handleOpenCreate}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text className="text-brand-accent text-xs font-bold">
-                + Set Budget
-              </Text>
-            </TouchableOpacity>
-          </View>
+        {/* ── Hero Section (Image 1): Month picker, big donut ring, bulb & add buttons, 5 mini pies ── */}
+        <BudgetHeroPie
+          monthLabel={monthLabel}
+          onOpenMonthPicker={() => {
+            setTempSelectedMonth(selectedMonth);
+            setIsMonthPickerOpen(true);
+          }}
+          onOpenCreateBudget={() =>
+            router.push({
+              pathname: "/createbudget" as any,
+              params: { month: selectedMonth },
+            })
+          }
+          onOpenBudgetSummary={() => router.push("/budgetsummary" as any)}
+          onOpenImportTemplate={handlePressImport}
+          remainingAmount={summary.totalRemaining}
+          totalBudget={summary.totalBudget}
+          progressPercent={summary.overallProgressPercent}
+          topCategories={summary.topCategories}
+          currency={settings?.currency}
+          numberFormat={settings?.numberFormat}
+        />
 
-          {budgets.length === 0 ? (
-            <TouchableOpacity
-              onPress={handleOpenCreate}
-              activeOpacity={0.7}
-              className="bg-dark-surface border border-dashed border-dark-border p-6 rounded-2xl items-center justify-center"
-            >
-              <View className="w-12 h-12 rounded-full bg-dark-card border border-dark-border items-center justify-center mb-2.5">
-                <Ionicons name="pie-chart-outline" size={22} color="#D4F938" />
-              </View>
-              <Text className="text-dark-text font-bold text-sm">
-                No Budgets Set
-              </Text>
-              <Text className="text-dark-muted text-xs mt-1 text-center">
-                Tap here to set a monthly spending allowance for your categories
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <View className="space-y-3 gap-3">
-              {budgets.map((b) => {
-                const spent = categorySpentMap.get(b.categoryId) || 0;
-                const pct =
-                  b.amount > 0 ? Math.round((spent / b.amount) * 100) : 0;
-                const isOver = spent > b.amount;
-
-                return (
-                  <TouchableOpacity
-                    key={b.id}
-                    onPress={() => handleOpenEdit(b)}
-                    activeOpacity={0.7}
-                    className="bg-dark-surface p-4 rounded-2xl border border-dark-border"
-                  >
-                    <View className="flex-row items-center justify-between mb-2.5">
-                      <View className="flex-row items-center gap-3">
-                        <View className="w-10 h-10 rounded-full bg-dark-card border border-dark-border items-center justify-center">
-                          <Ionicons
-                            name={(b.categoryIcon as any) || "pricetag-outline"}
-                            size={18}
-                            color="#F8FAFC"
-                          />
-                        </View>
-                        <View>
-                          <Text className="text-dark-text font-bold text-sm">
-                            {b.categoryName}
-                          </Text>
-                          <Text className="text-dark-muted text-xs">
-                            {isOver ? "Over Budget" : "Monthly Target"}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View className="items-end">
-                        <Text className="text-dark-text font-bold text-sm">
-                          {formatCurrency(
-                            spent,
-                            settings?.currency,
-                            settings?.numberFormat
-                          )}
-                        </Text>
-                        <Text className="text-dark-muted text-xs">
-                          of{" "}
-                          {formatCurrency(
-                            b.amount,
-                            settings?.currency,
-                            settings?.numberFormat
-                          )}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Category Progress Bar */}
-                    <View className="h-2 w-full bg-dark-card rounded-full overflow-hidden mt-1 p-0.5">
-                      <View
-                        style={{ width: `${Math.min(100, pct)}%` }}
-                        className={`h-full rounded-full ${
-                          pct >= 100
-                            ? "bg-rose-500"
-                            : pct >= 80
-                            ? "bg-amber-400"
-                            : "bg-emerald-400"
-                        }`}
-                      />
-                    </View>
-
-                    <View className="flex-row items-center justify-between mt-2">
-                      <Text
-                        className={`text-[11px] font-semibold ${
-                          isOver ? "text-rose-400" : "text-dark-muted"
-                        }`}
-                      >
-                        {isOver
-                          ? `${formatCurrency(
-                              spent - b.amount,
-                              settings?.currency,
-                              settings?.numberFormat
-                            )} exceeded`
-                          : `${formatCurrency(
-                              b.amount - spent,
-                              settings?.currency,
-                              settings?.numberFormat
-                            )} left`}
-                      </Text>
-                      <Text
-                        className={`text-[11px] font-bold ${
-                          pct >= 100
-                            ? "text-rose-400"
-                            : pct >= 80
-                            ? "text-amber-400"
-                            : "text-emerald-400"
-                        }`}
-                      >
-                        {pct}%
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+        {/* ── Detailed Budgets List (Image 2) ── */}
+        {summary.budgets.length === 0 ? (
+          <TouchableOpacity
+            onPress={() =>
+              router.push({
+                pathname: "/createbudget" as any,
+                params: { month: selectedMonth },
+              })
+            }
+            activeOpacity={0.7}
+            className="bg-dark-surface border border-dashed border-dark-border p-8 rounded-3xl items-center justify-center mt-2"
+          >
+            <View className="w-12 h-12 rounded-full bg-dark-card border border-dark-border items-center justify-center mb-3">
+              <Ionicons name="pie-chart-outline" size={24} color="#ffffff" />
             </View>
-          )}
-        </View>
+            <Text className="text-dark-text font-bold text-base">
+              No Budgets for {monthLabel}
+            </Text>
+            <Text className="text-dark-muted text-xs mt-1 text-center font-medium max-w-xs">
+              Tap here or the &quot;+&quot; button above to create a budget with
+              allocated expense categories
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          summary.budgets.map((b) => (
+            <BudgetDetailCard
+              key={b.id}
+              budget={b}
+              onEditBudget={(budget) => {
+                router.push({
+                  pathname: "/createbudget" as any,
+                  params: { id: String(budget.id), month: selectedMonth },
+                });
+              }}
+              onViewInsight={(budget) => {
+                router.push(`/budget/${budget.id}` as any);
+              }}
+              onAddNewCategory={handleOpenAddCategory}
+              onCategoryQuickAdd={handleCategoryQuickAdd}
+              currency={settings?.currency}
+              numberFormat={settings?.numberFormat}
+            />
+          ))
+        )}
       </ScrollView>
 
-      {/* Set / Edit Budget FlyUp */}
+      {/* ── Month Picker FlyUp with Select Button at bottom ── */}
       <HawkFlyUp
-        visible={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={selectedBudget ? "Edit Budget" : "Set Category Budget"}
+        visible={isMonthPickerOpen}
+        onClose={() => setIsMonthPickerOpen(false)}
+        title="Select Month"
       >
-        <View className="space-y-4 gap-4 pb-2">
-          {formError ? (
+        <View className="pb-4">
+          <Calendar
+            value={`${tempSelectedMonth}-01`}
+            mode="month-only"
+            onChange={(ymd) => setTempSelectedMonth(ymd.slice(0, 7))}
+          />
+          <View className="h-3" />
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedMonth(tempSelectedMonth);
+              setIsMonthPickerOpen(false);
+            }}
+            activeOpacity={0.8}
+            className="w-full h-12 rounded-2xl items-center justify-center bg-brand-accent active:opacity-90 shadow-md"
+          >
+            <Text className="text-dark-bg font-extrabold text-sm">
+              Select Month
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </HawkFlyUp>
+
+      {/* ── Add Category to Existing Budget FlyUp ── */}
+      <HawkFlyUp
+        visible={addCatBudgetId != null}
+        onClose={() => setAddCatBudgetId(null)}
+        title="Add Category to Budget"
+      >
+        <View className="space-y-4 gap-4 pb-4">
+          {addCatError ? (
             <View className="bg-rose-500/15 border border-rose-500/30 p-3 rounded-xl">
-              <Text className="text-rose-400 text-xs text-center font-semibold">
-                {formError}
+              <Text className="text-rose-400 text-xs text-center font-bold">
+                {addCatError}
               </Text>
             </View>
           ) : null}
 
-          {/* Category Selector */}
+          {/* Select Category */}
           <View>
-            <Text className="text-dark-muted text-xs font-semibold uppercase tracking-wider mb-2">
+            <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-2">
               Select Category
             </Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              className="flex-row gap-2 py-1"
+              className="py-1"
             >
-              {categories.map((cat) => {
-                const isSelected = selectedCategoryId === cat.id;
-                return (
-                  <TouchableOpacity
-                    key={cat.id}
-                    onPress={() => setSelectedCategoryId(cat.id)}
-                    activeOpacity={0.8}
-                    className={`flex-row items-center gap-2 px-3.5 py-2.5 rounded-2xl border mr-2 ${
-                      isSelected
-                        ? "bg-dark-card border-brand-accent"
-                        : "bg-dark-surface border-dark-border"
-                    }`}
-                  >
-                    <Ionicons
-                      name={(cat.icon as any) || "pricetag-outline"}
-                      size={16}
-                      color={isSelected ? "#D4F938" : "#94A3B8"}
-                    />
-                    <Text
-                      className={`text-xs font-bold ${
-                        isSelected ? "text-brand-accent" : "text-dark-text"
+              {availableCategoriesForBudget.length === 0 ? (
+                <Text className="text-dark-muted text-xs font-medium py-2">
+                  All available expense categories are already in this budget.
+                </Text>
+              ) : (
+                availableCategoriesForBudget.map((cat) => {
+                  const isSelected = selectedCatId === cat.id;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      onPress={() => setSelectedCatId(cat.id)}
+                      activeOpacity={0.8}
+                      className={`flex-row items-center gap-2 px-3.5 py-2.5 rounded-2xl border mr-2 ${
+                        isSelected
+                          ? "bg-dark-card border-brand-accent"
+                          : "bg-dark-surface border-dark-border"
                       }`}
                     >
-                      {cat.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                      <Ionicons
+                        name={(cat.icon as any) || "pricetag-outline"}
+                        size={16}
+                        color={isSelected ? "#D4F938" : "#94A3B8"}
+                      />
+                      <Text
+                        className={`text-xs font-bold ${
+                          isSelected ? "text-brand-accent" : "text-dark-text"
+                        }`}
+                      >
+                        {cat.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
             </ScrollView>
           </View>
 
           {/* Amount Input */}
           <View>
-            <Text className="text-dark-muted text-xs font-semibold uppercase tracking-wider mb-2">
-              Monthly Budget Amount
+            <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-2">
+              Budget Allocation Amount
             </Text>
             <View className="bg-dark-card border border-dark-border rounded-2xl px-4 py-3 flex-row items-center">
               <Text className="text-dark-muted font-bold text-lg mr-2">
                 {getCurrencySymbol(settings?.currency)}
               </Text>
               <TextInput
-                value={amountInput}
-                onChangeText={setAmountInput}
+                value={addCatAmount}
+                onChangeText={setAddCatAmount}
                 placeholder="0.00"
                 placeholderTextColor="#60677C"
                 keyboardType="decimal-pad"
-                className="flex-1 text-dark-text font-bold text-lg"
+                className="flex-1 text-dark-text font-bold text-lg p-0"
               />
             </View>
           </View>
 
-          {/* Actions */}
-          <View className="flex-row items-center gap-3 mt-2">
-            {selectedBudget ? (
-              <TouchableOpacity
-                onPress={handleDeleteBudget}
-                className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 items-center justify-center"
-                activeOpacity={0.8}
-              >
-                <Ionicons name="trash-outline" size={20} color="#F43F5E" />
-              </TouchableOpacity>
-            ) : null}
-
-            <TouchableOpacity
-              onPress={handleSaveBudget}
-              className="flex-1 h-12 rounded-2xl bg-brand-accent items-center justify-center active:opacity-90"
-              activeOpacity={0.8}
-            >
-              <Text className="text-dark-bg font-bold text-base">
-                {selectedBudget ? "Update Budget" : "Save Budget"}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {/* Action Button */}
+          <TouchableOpacity
+            onPress={handleSaveNewCategory}
+            activeOpacity={0.8}
+            className="h-13 py-3.5 rounded-2xl bg-brand-accent items-center justify-center mt-2 shadow-md active:opacity-90"
+          >
+            <Text className="text-dark-bg font-extrabold text-base">
+              Add Category
+            </Text>
+          </TouchableOpacity>
         </View>
+      </HawkFlyUp>
+
+      {/* ── Import Template FlyUp ── */}
+      <HawkFlyUp
+        visible={isImportFlyUpOpen}
+        onClose={() => setIsImportFlyUpOpen(false)}
+        title="Import Budget"
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          className="pb-4"
+        >
+          {/* ── 1. Copy Previous Month (Always shown first) ── */}
+          <Text className="text-dark-muted text-xs font-bold  tracking-wider mb-2.5">
+            Quick Copy
+          </Text>
+          {prevMonthSummary && prevMonthSummary.budgets.length > 0 ? (
+            <TouchableOpacity
+              onPress={() =>
+                handleSelectTemplateToApply(prevMonthSummary.month)
+              }
+              activeOpacity={0.7}
+              className="bg-dark-surface border border-dark-border rounded-2xl p-4 mb-6 flex-row items-center justify-between"
+            >
+              <View className="flex-row items-center gap-3 flex-1 mr-2">
+                <View className="flex-1">
+                  <Text className="text-dark-text font-bold text-sm">
+                    Copy Previous Month
+                  </Text>
+                  <Text className="text-dark-muted text-xs font-medium mt-0.5">
+                    {formatDisplayMonth(`${prevMonthSummary.month}-01`)} •{" "}
+                    {prevMonthSummary.budgets.length}{" "}
+                    {prevMonthSummary.budgets.length === 1
+                      ? "budget"
+                      : "budgets"}{" "}
+                    (
+                    {formatCurrency(
+                      prevMonthSummary.totalBudget,
+                      settings?.currency,
+                      settings?.numberFormat,
+                    )}
+                    )
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+          ) : (
+            <View className="bg-dark-surface border border-dashed border-dark-border/60 rounded-2xl p-4 mb-6">
+              <Text className="text-dark-muted text-xs font-medium text-center">
+                No budgets configured in previous month (
+                {formatDisplayMonth(`${getPreviousMonthYMD(selectedMonth)}-01`)}
+                ).
+              </Text>
+            </View>
+          )}
+
+          {/* ── 2. Saved Templates ── */}
+          <Text className="text-dark-muted text-xs font-bold  tracking-wider mb-2.5">
+            Saved Templates
+          </Text>
+          {savedTemplates.length === 0 ? (
+            <View className="bg-dark-surface border border-dashed border-dark-border/60 rounded-2xl p-5 items-center justify-center">
+              <Ionicons name="bookmark-outline" size={22} color="#94A3B8" />
+              <Text className="text-dark-text font-bold text-xs mt-2">
+                No Saved Templates Yet
+              </Text>
+              <Text className="text-dark-muted text-[11px] font-medium text-center mt-1">
+                Open any month in Budget Insight and check &quot;Save this month
+                as template&quot;.
+              </Text>
+            </View>
+          ) : (
+            savedTemplates.map((tpl) => (
+              <TouchableOpacity
+                key={tpl.month}
+                onPress={() => handleSelectTemplateToApply(tpl.month)}
+                activeOpacity={0.7}
+                className="bg-dark-surface border border-dark-border rounded-2xl p-4 mb-2.5 flex-row items-center justify-between"
+              >
+                <View className="flex-row items-center gap-3 flex-1 mr-2">
+                  <View className="flex-1">
+                    <Text className="text-dark-text font-bold text-sm">
+                      {formatDisplayMonth(`${tpl.month}-01`)} Template
+                    </Text>
+                    <Text className="text-dark-muted text-xs font-medium mt-0.5">
+                      {tpl.budgetCount}{" "}
+                      {tpl.budgetCount === 1 ? "budget" : "budgets"} •{" "}
+                      {formatCurrency(
+                        tpl.totalBudget,
+                        settings?.currency,
+                        settings?.numberFormat,
+                      )}{" "}
+                      allocated
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
       </HawkFlyUp>
     </SafeAreaView>
   );

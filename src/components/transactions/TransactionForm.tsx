@@ -22,14 +22,17 @@ import { TransactionItem, useTransactions } from "../../context/transactions";
 import { LiquidAssetType, TransactionType } from "../../db/schema";
 import { formatCurrency, getCurrencySymbol } from "../../services/currency";
 import { Calendar, formatDisplayDate, getTodayYMD } from "../calendar";
+import { ContactAvatar } from "../ContactAvatar";
 import { CreateContact } from "../contacts/CreateContact";
 import { HawkFlyUp } from "../HawkFlyUp";
+import { SearchBar } from "../SearchBar";
 import { SlideButton } from "../SlideButton";
 
 export interface TransactionFormProps {
   mode: "create" | "edit";
   initialData?: TransactionItem | null;
   defaultType?: "EXPENSE" | "INCOME" | "TRANSFER";
+  defaultCategoryId?: number | null;
 }
 
 // Time helper utilities
@@ -56,6 +59,7 @@ export function TransactionForm({
   mode,
   initialData,
   defaultType = "EXPENSE",
+  defaultCategoryId,
 }: TransactionFormProps) {
   const router = useRouter();
   const {
@@ -94,7 +98,7 @@ export function TransactionForm({
     initialData?.toAssetId ?? null,
   );
   const [categoryId, setCategoryId] = useState<number | null>(
-    initialData?.categoryId ?? null,
+    initialData?.categoryId ?? defaultCategoryId ?? null,
   );
   const [contactId, setContactId] = useState<number | null>(
     initialData?.contactId ?? null,
@@ -122,6 +126,14 @@ export function TransactionForm({
   const [isContactSheetOpen, setIsContactSheetOpen] = useState(false);
   const [tempContactId, setTempContactId] = useState<number | null>(null);
   const [isCreateContactOpen, setIsCreateContactOpen] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
+
+  const filteredContacts = useMemo(() => {
+    if (!contactSearch.trim()) return contacts;
+    return contacts.filter((c) =>
+      c.name.toLowerCase().includes(contactSearch.toLowerCase()),
+    );
+  }, [contacts, contactSearch]);
 
   const [isNoteSheetOpen, setIsNoteSheetOpen] = useState(false);
   const [tempNote, setTempNote] = useState("");
@@ -256,6 +268,7 @@ export function TransactionForm({
   // Contact Sheet Open Handler
   const openContactSheet = () => {
     setTempContactId(contactId);
+    setContactSearch("");
     setIsContactSheetOpen(true);
   };
 
@@ -1110,27 +1123,47 @@ export function TransactionForm({
         onClose={() => setIsContactSheetOpen(false)}
         title="Select Contact"
       >
-        {contacts.length === 0 ? (
+        <View className="flex-row items-center gap-2.5 mb-4">
+          <SearchBar
+            value={contactSearch}
+            onChangeText={setContactSearch}
+            placeholder="Search contacts..."
+            className="flex-1"
+          />
+          <TouchableOpacity
+            onPress={() => setIsCreateContactOpen(true)}
+            className="h-12 w-12 rounded-xl bg-dark-surface border border-dark-border items-center justify-center active:bg-dark-card"
+            activeOpacity={0.7}
+          >
+            <Ionicons name="person-add-outline" size={20} color="#F8FAFC" />
+          </TouchableOpacity>
+        </View>
+
+        {filteredContacts.length === 0 ? (
           <View className="py-8 items-center justify-center">
             <View className="w-12 h-12 rounded-full bg-dark-surface border border-dark-border items-center justify-center mb-3">
               <Ionicons name="people-outline" size={22} color="#60677C" />
             </View>
             <Text className="text-dark-text font-bold text-sm mb-1">
-              No Contacts Yet
+              {contacts.length === 0 ? "No Contacts Yet" : "No Contacts Found"}
             </Text>
             <Text className="text-dark-muted text-xs text-center mb-5 max-w-[220px]">
-              Add a contact to link transactions to people or companies.
+              {contacts.length === 0
+                ? "Add a contact to link transactions to people or companies."
+                : "No contacts match your search."}
             </Text>
-            <TouchableOpacity
-              onPress={() => setIsCreateContactOpen(true)}
-              activeOpacity={0.8}
-              className="bg-brand-accent px-5 py-3 rounded-full flex-row items-center gap-2 active:opacity-90"
-            >
-              <Ionicons name="person-add" size={18} color="#0B0D12" />
-              <Text className="text-brand-accentDark font-bold text-sm">
-                New Contact
-              </Text>
-            </TouchableOpacity>
+            {contacts.length === 0 ? (
+              <TouchableOpacity
+                onPress={() => setIsCreateContactOpen(true)}
+                activeOpacity={0.8}
+                className="bg-brand-accent px-5 py-3 rounded-full flex-row items-center gap-2 active:opacity-90"
+              >
+                <Ionicons name="person-add" size={18} color="#0B0D12" />
+                <Text className="text-brand-accentDark font-bold text-sm">
+                  New Contact
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : (
           <>
@@ -1139,9 +1172,8 @@ export function TransactionForm({
               showsVerticalScrollIndicator={false}
             >
               <View className="flex-row flex-wrap gap-4 py-2 justify-center">
-                {contacts.map((c) => {
+                {filteredContacts.map((c) => {
                   const isSelected = tempContactId === c.id;
-                  const initial = c.name ? c.name[0].toUpperCase() : "?";
 
                   return (
                     <View key={c.id} className="items-center w-[22%]">
@@ -1150,25 +1182,21 @@ export function TransactionForm({
                           setTempContactId(isSelected ? null : c.id)
                         }
                         activeOpacity={0.7}
-                        className={`w-14 h-14 rounded-full items-center justify-center border-2 ${
-                          isSelected
-                            ? "border-brand-accent bg-brand-accent/20"
-                            : "border-dark-border bg-dark-card"
+                        className={`w-14 h-14 rounded-full items-center justify-center ${
+                          isSelected ? "border-2 border-brand-accent p-0.5" : ""
                         }`}
                       >
-                        <Text
-                          className={`text-lg font-bold ${
-                            isSelected ? "text-brand-accent" : "text-dark-text"
-                          }`}
-                        >
-                          {initial}
-                        </Text>
+                        <ContactAvatar
+                          name={c.name}
+                          avatarSvg={c.avatarSvg}
+                          size={50}
+                        />
                       </TouchableOpacity>
                       <Text
                         className={`text-xs text-center mt-1 ${
                           isSelected
                             ? "text-brand-accent font-bold"
-                            : "text-dark-textSecondary"
+                            : "text-dark-textSecondary font-medium"
                         }`}
                         numberOfLines={1}
                       >
@@ -1180,22 +1208,11 @@ export function TransactionForm({
               </View>
             </ScrollView>
 
-            <View className="flex-row items-center gap-3 mt-4">
-              <TouchableOpacity
-                onPress={() => setIsCreateContactOpen(true)}
-                activeOpacity={0.8}
-                className="flex-1 bg-dark-card border border-dark-border py-3.5 rounded-2xl items-center justify-center flex-row gap-1.5"
-              >
-                <Ionicons name="person-add-outline" size={18} color="#D4F938" />
-                <Text className="text-brand-accent font-bold text-sm">
-                  New Contact
-                </Text>
-              </TouchableOpacity>
-
+            <View className="mt-4">
               <TouchableOpacity
                 onPress={handleConfirmContact}
                 activeOpacity={0.8}
-                className="flex-1 bg-brand-accent py-3.5 rounded-2xl items-center justify-center"
+                className="w-full bg-brand-accent py-3.5 rounded-2xl items-center justify-center"
               >
                 <Text className="text-dark-bg font-bold text-base">Select</Text>
               </TouchableOpacity>
@@ -1259,7 +1276,7 @@ export function TransactionForm({
         />
 
         {/* Digital Time Picker Box */}
-        <View className="bg-dark-card border border-dark-border rounded-2xl p-3.5 mb-3">
+        <View className="border border-dark-border rounded-2xl p-3.5 mb-3">
           <View className="flex-row items-center justify-between mb-2">
             <TouchableOpacity
               onPress={() => {
@@ -1270,9 +1287,9 @@ export function TransactionForm({
                 setHourInput(String(now.hour12).padStart(2, "0"));
                 setMinuteInput(String(now.minute).padStart(2, "0"));
               }}
-              className="bg-dark-surface border border-dark-border rounded-xl px-2.5 py-1 active:bg-dark-cardHover"
+              className=" bg-dark-card border border-dark-border rounded-xl px-2.5 py-1 active:bg-dark-cardHover"
             >
-              <Text className="text-brand-accent text-xs font-semibold">
+              <Text className="text-dark-textSecondary text-xs font-semibold">
                 Set to Now
               </Text>
             </TouchableOpacity>

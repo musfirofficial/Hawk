@@ -71,9 +71,6 @@ export function ProfileForm({
   const selectedCurrencyObj = SUPPORTED_CURRENCIES.find(
     (c) => c.code === selectedCurrency,
   );
-  const selectedFormatObj = NUMBER_FORMATS.find(
-    (fmt) => fmt.id === selectedFormat,
-  );
 
   const canSubmit = name.trim().length > 0 && selectedCurrency.length > 0;
 
@@ -203,13 +200,13 @@ export function ProfileForm({
             <Text className="text-dark-text text-sm font-semibold mb-2">
               Name
             </Text>
-            <View className="bg-dark-surface border border-dark-border rounded-2xl px-4 py-3.5">
+            <View className="h-14 bg-dark-surface border border-dark-border rounded-2xl px-4 justify-center">
               <TextInput
                 placeholder="Enter your name"
                 placeholderTextColor="#60677C"
                 value={name}
                 onChangeText={setName}
-                className="text-dark-text text-sm py-0"
+                className="text-dark-text text-sm py-0 font-medium"
                 autoCapitalize="words"
               />
             </View>
@@ -223,7 +220,7 @@ export function ProfileForm({
 
             <TouchableOpacity
               onPress={() => setCurrencyPickerVisible(true)}
-              className="bg-dark-surface border border-dark-border rounded-2xl px-4 py-3.5 flex-row items-center justify-between"
+              className="h-14 bg-dark-surface border border-dark-border rounded-2xl px-4 flex-row items-center justify-between"
               activeOpacity={0.8}
             >
               <Text
@@ -253,6 +250,7 @@ export function ProfileForm({
           <View>
             <Dropdown
               label="Number Format"
+              triggerClassName="h-14"
               options={NUMBER_FORMATS.map((fmt) => ({
                 value: fmt.id,
                 label: fmt.label,

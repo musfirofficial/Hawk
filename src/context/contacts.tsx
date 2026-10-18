@@ -9,12 +9,14 @@ import React, {
 } from "react";
 import { db, ensureDatabaseInitialized, expoDb } from "../db";
 import * as schema from "../db/schema";
+import { generateContactAvatar } from "../services/avatarService";
 
 export interface ContactItem {
   id: number;
   name: string;
   mobileNumber: string | null;
   note: string | null;
+  avatarSvg: string | null;
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
@@ -27,12 +29,14 @@ export interface CreateContactInput {
   name: string;
   mobileNumber?: string | null;
   note?: string | null;
+  avatarSvg?: string | null;
 }
 
 export interface UpdateContactInput {
   name?: string;
   mobileNumber?: string | null;
   note?: string | null;
+  avatarSvg?: string | null;
 }
 
 interface ContactsContextType {
@@ -53,6 +57,7 @@ interface RawContactQueryRow {
   name: string;
   mobile_number: string | null;
   note: string | null;
+  avatar_svg: string | null;
   is_archived: number;
   created_at: string;
   updated_at: string;
@@ -75,6 +80,7 @@ export function ContactsProvider({ children }: { children: React.ReactNode }) {
           c.name,
           c.mobile_number,
           c.note,
+          c.avatar_svg,
           c.is_archived,
           c.created_at,
           c.updated_at,
@@ -103,6 +109,7 @@ export function ContactsProvider({ children }: { children: React.ReactNode }) {
         name: row.name,
         mobileNumber: row.mobile_number,
         note: row.note,
+        avatarSvg: row.avatar_svg,
         isArchived: Boolean(row.is_archived),
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -140,13 +147,28 @@ export function ContactsProvider({ children }: { children: React.ReactNode }) {
     async (data: CreateContactInput): Promise<number> => {
       ensureDatabaseInitialized();
       const now = new Date().toISOString();
+      const trimmedName = data.name.trim();
+
+      const existing = expoDb.getFirstSync<{ id: number }>(
+        `SELECT id FROM contacts WHERE LOWER(name) = LOWER(?) AND is_archived = 0;`,
+        [trimmedName]
+      );
+      if (existing) {
+        throw new Error("A contact with this name already exists.");
+      }
+
+      const avatarSvg =
+        data.avatarSvg !== undefined
+          ? data.avatarSvg
+          : generateContactAvatar(trimmedName);
 
       const result = db
         .insert(schema.contacts)
         .values({
-          name: data.name.trim(),
+          name: trimmedName,
           mobileNumber: data.mobileNumber?.trim() || null,
           note: data.note?.trim() || null,
+          avatarSvg,
           isArchived: false,
           createdAt: now,
           updatedAt: now,
@@ -169,10 +191,26 @@ export function ContactsProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       };
 
-      if (data.name !== undefined) updateValues.name = data.name.trim();
+      if (data.name !== undefined) {
+        const trimmed = data.name.trim();
+
+        const existing = expoDb.getFirstSync<{ id: number }>(
+          `SELECT id FROM contacts WHERE LOWER(name) = LOWER(?) AND id != ? AND is_archived = 0;`,
+          [trimmed, id]
+        );
+        if (existing) {
+          throw new Error("A contact with this name already exists.");
+        }
+
+        updateValues.name = trimmed;
+        if (data.avatarSvg === undefined) {
+          updateValues.avatarSvg = generateContactAvatar(trimmed);
+        }
+      }
       if (data.mobileNumber !== undefined)
         updateValues.mobileNumber = data.mobileNumber?.trim() || null;
       if (data.note !== undefined) updateValues.note = data.note?.trim() || null;
+      if (data.avatarSvg !== undefined) updateValues.avatarSvg = data.avatarSvg;
 
       db.update(schema.contacts)
         .set(updateValues)

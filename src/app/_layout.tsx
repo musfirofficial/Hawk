@@ -148,6 +148,41 @@ function NavigationGate() {
             presentation: "card",
           }}
         />
+        <Stack.Screen
+          name="createbudget"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+        <Stack.Screen
+          name="budgetsummary"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+        <Stack.Screen
+          name="budget/[id]"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+        <Stack.Screen
+          name="createdebt"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+        <Stack.Screen
+          name="alldebts"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
         <Stack.Screen name="(transaction)" options={{ headerShown: false }} />
         <Stack.Screen name="(account)" options={{ headerShown: false }} />
       </Stack>

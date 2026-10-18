@@ -47,33 +47,43 @@ module.exports = {
       addUtilities({
         ".font-sans": {
           fontFamily: "DMSans_400Regular",
+          fontWeight: "normal",
         },
         ".font-regular": {
           fontFamily: "DMSans_400Regular",
+          fontWeight: "normal",
         },
         ".font-normal": {
           fontFamily: "DMSans_400Regular",
+          fontWeight: "normal",
         },
         ".font-light": {
           fontFamily: "DMSans_400Regular",
+          fontWeight: "normal",
         },
         ".font-thin": {
           fontFamily: "DMSans_400Regular",
+          fontWeight: "normal",
         },
         ".font-medium": {
           fontFamily: "DMSans_500Medium",
+          fontWeight: "normal",
         },
         ".font-semibold": {
           fontFamily: "DMSans_600SemiBold",
+          fontWeight: "normal",
         },
         ".font-bold": {
           fontFamily: "DMSans_700Bold",
+          fontWeight: "normal",
         },
         ".font-extrabold": {
           fontFamily: "DMSans_800ExtraBold",
+          fontWeight: "normal",
         },
         ".font-black": {
           fontFamily: "DMSans_900Black",
+          fontWeight: "normal",
         },
       });
     },

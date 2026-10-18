@@ -1,277 +1,226 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { useRouter } from "expo-router";
+import React, { useMemo, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { CreateDebts } from "../../components/debts/CreateDebts";
+import { DebtCard } from "../../components/debts/DebtCard";
 import { EditDebts } from "../../components/debts/EditDebts";
 import { useAuth } from "../../context/auth";
 import { DebtItem, useDebts } from "../../context/debts";
-import { DebtType } from "../../db/schema";
 import { formatCurrency } from "../../services/currency";
 
 export default function DebtsScreen() {
+  const router = useRouter();
   const {
-    lentDebts,
-    borrowedDebts,
+    debts,
     totalLentRemaining,
     totalBorrowedRemaining,
-    activeLentCount,
-    activeBorrowedCount,
   } = useDebts();
   const { settings } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<DebtType>("LEND");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [showBalance, setShowBalance] = useState(true);
   const [selectedDebt, setSelectedDebt] = useState<DebtItem | null>(null);
 
-  const currentList = activeTab === "LEND" ? lentDebts : borrowedDebts;
+  // Total receivable minus borrowed (Debt State)
+  const netDebt = totalLentRemaining - totalBorrowedRemaining;
 
-  function handleOpenCreate(type: DebtType = activeTab) {
-    setActiveTab(type);
-    setIsCreateOpen(true);
-  }
+  // Ongoing (unsettled) debts ordered by closest to due date (up to 4)
+  const ongoingDebts = useMemo(() => {
+    const active = debts.filter((d) => !d.isSettled);
+    return active
+      .sort((a, b) => {
+        if (a.dueDate && b.dueDate) {
+          return a.dueDate.localeCompare(b.dueDate);
+        }
+        if (a.dueDate) return -1;
+        if (b.dueDate) return 1;
+        return b.createdAt.localeCompare(a.createdAt);
+      })
+      .slice(0, 4);
+  }, [debts]);
 
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-dark-bg">
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-5 pt-3 pb-1">
-        <Text className="text-dark-text text-xl font-bold">Debts & Loans</Text>
-        <TouchableOpacity
-          onPress={() => handleOpenCreate(activeTab)}
-          className="w-10 h-10 rounded-full bg-brand-accent items-center justify-center"
-          activeOpacity={0.8}
-        >
-          <Ionicons name="add" size={24} color="#0B0D12" />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 110 }}
         className="flex-1 px-5 pt-3"
       >
-        {/* Summary Metrics */}
-        <View className="flex-row gap-3 mb-6">
-          <View className="flex-1 bg-dark-surface p-4 rounded-3xl border border-dark-border">
-            <View className="w-8 h-8 rounded-full bg-dark-card border border-dark-border items-center justify-center mb-2">
-              <Ionicons
-                name="arrow-up"
-                size={16}
-                color="#F59E0B"
-              />
+        {/* 1. First Debts heading like in budget tab/page */}
+        <View className="pt-2 pb-5 items-center justify-center">
+          <Text className="text-dark-text text-xl font-bold text-center">
+            Debts
+          </Text>
+        </View>
+
+        {/* 2. Yellow Accent Hero Card for Debt State with Eye & Plus Buttons */}
+        <View className="bg-brand-accent rounded-3xl p-5 shadow-lg mb-4">
+          {/* Top Row: Debt State Tag & Actions (Eye + Plus Button) */}
+          <View className="flex-row items-center justify-between mb-1">
+            <View className="flex-row items-center bg-dark-bg/15 px-3 py-1.5 rounded-full gap-1.5">
+              <Ionicons name="scale-outline" size={14} color="#0B0D12" />
+              <Text className="text-dark-bg font-bold text-xs">
+                Debt State
+              </Text>
             </View>
-            <Text className="text-dark-muted text-xs font-semibold">
-              I Am Owed
-            </Text>
-            <Text className="text-brand-lend text-xl font-extrabold mt-1">
-              {formatCurrency(
-                totalLentRemaining,
-                settings?.currency,
-                settings?.numberFormat
-              )}
-            </Text>
-            <Text className="text-dark-muted text-[10px] mt-0.5">
-              {activeLentCount} active {activeLentCount === 1 ? "loan" : "loans"}
+
+            {/* Actions: Eye Toggler & Add Debt Button */}
+            <View className="flex-row items-center gap-2">
+              <TouchableOpacity
+                onPress={() => setShowBalance(!showBalance)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className="w-8 h-8 rounded-full bg-dark-bg/15 items-center justify-center"
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={showBalance ? "eye-outline" : "eye-off-outline"}
+                  size={17}
+                  color="#0B0D12"
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push("/createdebt" as any)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className="w-8 h-8 rounded-full bg-dark-bg/15 items-center justify-center"
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add" size={20} color="#0B0D12" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Grand Debt State Amount */}
+          <Text className="text-dark-bg text-4xl font-extrabold tracking-tight my-2.5">
+            {showBalance
+              ? netDebt < 0
+                ? `-${formatCurrency(
+                    Math.abs(netDebt),
+                    settings?.currency,
+                    settings?.numberFormat
+                  )}`
+                : formatCurrency(
+                    netDebt,
+                    settings?.currency,
+                    settings?.numberFormat
+                  )
+              : "••••••••"}
+          </Text>
+
+          {/* Subtitle Status */}
+          <Text className="text-dark-bg/80 font-bold text-xs">
+            {netDebt > 0
+              ? "Net Receivable in your favor"
+              : netDebt < 0
+              ? "Net Borrowed to be repaid"
+              : "All debts are balanced"}
+          </Text>
+        </View>
+
+        {/* 3. The 2 Cards (Receivable & Borrowed) outside yellow card, affected by eye toggle */}
+        <View className="flex-row items-center gap-2.5 mb-6">
+          {/* Receivable Card */}
+          <View className="flex-1 bg-dark-surface border border-dark-border rounded-2xl p-3.5">
+            <View className="flex-row items-center justify-between mb-2">
+              <View className="w-8 h-8 rounded-full bg-dark-card border border-dark-border items-center justify-center">
+                <Ionicons name="arrow-up" size={16} color="#F59E0B" />
+              </View>
+              <Text className="text-dark-muted font-semibold text-xs">
+                Receivable
+              </Text>
+            </View>
+            <Text
+              className="text-dark-text text-base font-extrabold tracking-tight"
+              numberOfLines={1}
+            >
+              {showBalance
+                ? formatCurrency(
+                    totalLentRemaining,
+                    settings?.currency,
+                    settings?.numberFormat
+                  )
+                : "••••••"}
             </Text>
           </View>
 
-          <View className="flex-1 bg-dark-surface p-4 rounded-3xl border border-dark-border">
-            <View className="w-8 h-8 rounded-full bg-dark-card border border-dark-border items-center justify-center mb-2">
-              <Ionicons
-                name="arrow-down"
-                size={16}
-                color="#A855F7"
-              />
+          {/* Borrowed Card */}
+          <View className="flex-1 bg-dark-surface border border-dark-border rounded-2xl p-3.5">
+            <View className="flex-row items-center justify-between mb-2">
+              <View className="w-8 h-8 rounded-full bg-dark-card border border-dark-border items-center justify-center">
+                <Ionicons name="arrow-down" size={16} color="#A855F7" />
+              </View>
+              <Text className="text-dark-muted font-semibold text-xs">
+                Borrowed
+              </Text>
             </View>
-            <Text className="text-dark-muted text-xs font-semibold">I Owe</Text>
-            <Text className="text-brand-borrow text-xl font-extrabold mt-1">
-              {formatCurrency(
-                totalBorrowedRemaining,
-                settings?.currency,
-                settings?.numberFormat
-              )}
-            </Text>
-            <Text className="text-dark-muted text-[10px] mt-0.5">
-              {activeBorrowedCount} borrowed{" "}
-              {activeBorrowedCount === 1 ? "debt" : "debts"}
+            <Text
+              className="text-dark-text text-base font-extrabold tracking-tight"
+              numberOfLines={1}
+            >
+              {showBalance
+                ? formatCurrency(
+                    totalBorrowedRemaining,
+                    settings?.currency,
+                    settings?.numberFormat
+                  )
+                : "••••••"}
             </Text>
           </View>
         </View>
 
-        {/* Tab Toggle */}
-        <View className="bg-dark-surface p-1 rounded-2xl border border-dark-border flex-row mb-4">
+        {/* 4. Ongoing Debts Section Header */}
+        <View className="flex-row items-center justify-between mb-3.5 px-0.5">
+          <Text className="text-dark-text text-lg font-bold">
+            Ongoing Debts
+          </Text>
           <TouchableOpacity
-            onPress={() => setActiveTab("LEND")}
-            className={`flex-1 py-2.5 rounded-xl items-center ${
-              activeTab === "LEND" ? "bg-brand-accent" : ""
-            }`}
-          >
-            <Text
-              className={`text-xs font-bold ${
-                activeTab === "LEND" ? "text-dark-bg" : "text-dark-muted"
-              }`}
-            >
-              Money Lent (Receivable)
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setActiveTab("BORROW")}
-            className={`flex-1 py-2.5 rounded-xl items-center ${
-              activeTab === "BORROW" ? "bg-brand-accent" : ""
-            }`}
-          >
-            <Text
-              className={`text-xs font-bold ${
-                activeTab === "BORROW" ? "text-dark-bg" : "text-dark-muted"
-              }`}
-            >
-              Money Borrowed (Payable)
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Debts List */}
-        {currentList.length === 0 ? (
-          <TouchableOpacity
-            onPress={() => handleOpenCreate(activeTab)}
+            onPress={() => router.push("/alldebts" as any)}
             activeOpacity={0.7}
-            className="bg-dark-surface border border-dashed border-dark-border p-8 rounded-2xl items-center justify-center mt-2"
+            className="py-1 px-2 -mr-2"
           >
-            <View className="w-12 h-12 rounded-full bg-dark-card border border-dark-border items-center justify-center mb-2.5">
-              <Ionicons
-                name={
-                  activeTab === "LEND"
-                    ? "arrow-up"
-                    : "arrow-down"
-                }
-                size={22}
-                color={activeTab === "LEND" ? "#F59E0B" : "#A855F7"}
-              />
+            <Text className="text-dark-muted active:text-dark-text text-xs font-semibold">
+              View all
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 5. Ongoing Debts Cards (up to 4) */}
+        {ongoingDebts.length === 0 ? (
+          <View className="bg-dark-surface border border-dashed border-dark-border p-8 rounded-3xl items-center justify-center mt-1">
+            <View className="w-12 h-12 rounded-full bg-dark-card border border-dark-border items-center justify-center mb-3">
+              <Ionicons name="receipt-outline" size={22} color="#94A3B8" />
             </View>
             <Text className="text-dark-text font-bold text-sm">
-              {activeTab === "LEND" ? "No Lent Money" : "No Borrowed Money"}
+              No Ongoing Debts
             </Text>
-            <Text className="text-dark-muted text-xs mt-1 text-center">
-              {activeTab === "LEND"
-                ? "Tap here to record money you lent to a contact"
-                : "Tap here to record money you borrowed from someone"}
+            <Text className="text-dark-muted font-sans text-xs mt-1 text-center max-w-[240px]">
+              You don't have any active loans or debts. Tap the + button to record one.
             </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/createdebt" as any)}
+              className="mt-4 px-4 py-2 rounded-full bg-dark-card border border-dark-border flex-row items-center gap-2 active:bg-dark-surface"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="add" size={16} color="#F8FAFC" />
+              <Text className="text-dark-text font-semibold text-xs">
+                Record Debt
+              </Text>
+            </TouchableOpacity>
+          </View>
         ) : (
-          <View className="space-y-3 gap-3">
-            {currentList.map((debt) => {
-              const initials = debt.contactName
-                .split(" ")
-                .filter(Boolean)
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join("")
-                .toUpperCase();
-
-              const isLend = debt.type === "LEND";
-              const accentColor = isLend ? "#F59E0B" : "#A855F7";
-              const accentClass = isLend
-                ? "text-brand-lend"
-                : "text-brand-borrow";
-              const bgBarClass = isLend ? "bg-brand-lend" : "bg-brand-borrow";
-
-              return (
-                <TouchableOpacity
-                  key={debt.id}
-                  onPress={() => setSelectedDebt(debt)}
-                  activeOpacity={0.7}
-                  className="bg-dark-surface p-4 rounded-2xl border border-dark-border"
-                >
-                  <View className="flex-row items-center justify-between mb-2">
-                    <View className="flex-row items-center gap-3 flex-1 mr-2">
-                      <View className="w-10 h-10 rounded-full bg-dark-card items-center justify-center border border-dark-border">
-                        <Text className="text-dark-text font-bold text-sm">
-                          {initials || "D"}
-                        </Text>
-                      </View>
-                      <View className="flex-1">
-                        <Text
-                          className="text-dark-text font-bold text-sm"
-                          numberOfLines={1}
-                        >
-                          {debt.contactName}
-                        </Text>
-                        <Text
-                          className="text-dark-muted text-xs"
-                          numberOfLines={1}
-                        >
-                          {debt.dueDate
-                            ? `Due: ${debt.dueDate}`
-                            : debt.note || (isLend ? "Money Lent" : "Money Borrowed")}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View className="items-end">
-                      <Text className={`font-bold text-base ${accentClass}`}>
-                        {formatCurrency(
-                          debt.remainingAmount,
-                          settings?.currency,
-                          settings?.numberFormat
-                        )}
-                      </Text>
-                      <View
-                        className={`px-2 py-0.5 rounded-full mt-0.5 ${
-                          debt.isSettled
-                            ? "bg-brand-accent/15"
-                            : debt.repaidAmount > 0
-                            ? isLend
-                              ? "bg-brand-lend/10"
-                              : "bg-brand-borrow/10"
-                            : "bg-dark-card"
-                        }`}
-                      >
-                        <Text
-                          className={`text-[10px] font-bold ${
-                            debt.isSettled
-                              ? "text-brand-accent"
-                              : debt.repaidAmount > 0
-                              ? accentClass
-                              : "text-dark-muted"
-                          }`}
-                        >
-                          {debt.isSettled
-                            ? "SETTLED"
-                            : debt.repaidAmount > 0
-                            ? `${formatCurrency(
-                                debt.repaidAmount,
-                                settings?.currency,
-                                settings?.numberFormat
-                              )} Repaid`
-                            : "No repayments"}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Repayment Progress Bar */}
-                  <View className="w-full bg-dark-card h-1.5 rounded-full overflow-hidden mt-2">
-                    <View
-                      className={`h-full ${bgBarClass}`}
-                      style={{ width: `${debt.progressPercent}%` }}
-                    />
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+          <View>
+            {ongoingDebts.map((debt) => (
+              <DebtCard
+                key={debt.id}
+                debt={debt}
+                onPress={() => setSelectedDebt(debt)}
+              />
+            ))}
           </View>
         )}
       </ScrollView>
 
-      {/* Create Debt Modal */}
-      <CreateDebts
-        visible={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        defaultType={activeTab}
-      />
-
-      {/* Edit Debt Modal */}
+      {/* Edit / Detail Modal on Card Press */}
       <EditDebts
         visible={Boolean(selectedDebt)}
         onClose={() => setSelectedDebt(null)}

@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -43,7 +42,10 @@ export default function SettingsScreen() {
     type: null,
     label: "Biometrics",
   });
-  const [darkModePlaceholder, setDarkModePlaceholder] = useState(true);
+
+  const hasPin = Boolean(settings?.pin);
+  const isPinEnabled = Boolean(settings?.pinEnabled);
+  const isGoogleConnected = Boolean(settings?.googleEmail);
 
   useEffect(() => {
     async function loadBio() {
@@ -53,35 +55,12 @@ export default function SettingsScreen() {
     loadBio();
   }, []);
 
-  // Guarded Edit Profile
-  function handleEditProfilePress() {
-    requireSecurityAuth({
-      ruleKey: "editProfile",
-      title: "Verify Identity",
-      description: "Verify your identity to edit profile details",
-      onSuccess: () => {
-        router.push("/edit-profile" as any);
-      },
-    });
-  }
-
-  // Guarded Google Account / Mail action
-  function handleGooglePress() {
-    requireSecurityAuth({
-      ruleKey: "manageAccount",
-      title: "Verify Identity",
-      description: "Verify your identity to manage connected accounts",
-      onSuccess: () => {
-        executeGoogleAccountAction();
-      },
-    });
-  }
-
-  async function executeGoogleAccountAction() {
-    if (settings?.googleEmail) {
+  // Google Account action
+  async function handleGooglePress() {
+    if (isGoogleConnected) {
       showConfirm({
         title: "Google Account",
-        message: `Connected as ${settings.googleEmail}. Do you want to disconnect?`,
+        message: `Connected as ${settings?.googleEmail}. Do you want to disconnect?`,
         type: "warning",
         confirmText: "Disconnect",
         isDestructive: true,
@@ -126,90 +105,98 @@ export default function SettingsScreen() {
     }
   }
 
+  // Dynamic PIN Setup or Change
+  function handlePinAction() {
+    router.push("/change-pin" as any);
+  }
+
+  // PIN Verification Toggle
+  function handleTogglePin(val: boolean) {
+    if (val) {
+      if (!hasPin) {
+        // If user hasn't created a PIN yet, prompt creation
+        router.push("/change-pin" as any);
+      } else {
+        updateSecuritySettings({ pinEnabled: true });
+      }
+    } else {
+      // Disabling PIN requires PIN or biometric verification first
+      requireSecurityAuth({
+        title: "Disable PIN",
+        description: "Verify your identity to disable PIN verification",
+        onSuccess: async () => {
+          await updateSecuritySettings({
+            pinEnabled: false,
+            biometricsEnabled: false,
+            appLockEnabled: false,
+          });
+        },
+      });
+    }
+  }
+
+  // Biometrics Toggle
   async function handleToggleBiometrics(val: boolean) {
-    if (val && bioCapability.isAvailable) {
-      const res = await authenticateWithBiometrics(
-        `Confirm ${bioCapability.label} to enable`,
-      );
-      if (res.success) {
-        await updateSecuritySettings({ biometricsEnabled: true });
+    if (val) {
+      if (!isPinEnabled) {
+        showAlert({
+          title: "PIN Required",
+          message: "Enable PIN verification before activating biometrics.",
+          type: "info",
+        });
+        return;
+      }
+
+      if (bioCapability.isAvailable) {
+        const res = await authenticateWithBiometrics(
+          `Confirm ${bioCapability.label} to enable`,
+        );
+        if (res.success) {
+          await updateSecuritySettings({ biometricsEnabled: true });
+        }
       }
     } else {
       await updateSecuritySettings({ biometricsEnabled: false });
     }
   }
 
-  // Guarded Security Checks Page
-  function handleOpenSecurityChecks() {
-    requireSecurityAuth({
-      title: "Security Checks",
-      description: "Verify your identity to modify security rules",
-      onSuccess: () => {
-        router.push("/security-permissions" as any);
-      },
-    });
-  }
-
-  function handleBackup() {
-    requireSecurityAuth({
-      ruleKey: "backupRestore",
-      title: "Confirm Cloud Backup",
-      onSuccess: () => {
+  // App Startup Lock Toggle
+  function handleToggleAppLock(val: boolean) {
+    if (val) {
+      // Enabling won't ask PIN
+      if (!isPinEnabled) {
         showAlert({
-          title: "Success",
-          message: "Database backed up successfully.",
-          type: "success",
-        });
-      },
-    });
-  }
-
-  function handleRestore() {
-    requireSecurityAuth({
-      ruleKey: "backupRestore",
-      title: "Confirm Data Retrieval",
-      onSuccess: () => {
-        showAlert({
-          title: "Success",
-          message: "Database restored successfully.",
-          type: "success",
-        });
-      },
-    });
-  }
-
-  function handleResetData() {
-    requireSecurityAuth({
-      ruleKey: "resetData",
-      title: "Authorize Reset",
-      onSuccess: () => {
-        showConfirm({
-          title: "Erase & Reset Data",
+          title: "PIN Required",
           message:
-            "Are you sure you want to delete all accounts and transactions? This cannot be undone.",
-          type: "danger",
-          confirmText: "Erase All",
-          isDestructive: true,
-          onConfirm: () => {
-            db.delete(schema.transactions).run();
-            db.delete(schema.liquidAssets).run();
-            db.delete(schema.contacts).run();
-            reloadSettings();
-            showAlert({
-              title: "Reset Complete",
-              message: "All data has been cleared.",
-              type: "success",
-            });
-          },
+            "Enable PIN verification before activating App Startup Lock.",
+          type: "info",
         });
-      },
-    });
+        return;
+      }
+      updateSecuritySettings({ appLockEnabled: true });
+    } else {
+      // Disabling requires PIN or biometric verification
+      requireSecurityAuth({
+        title: "Disable App Startup Lock",
+        description: "Verify your identity to disable startup lock",
+        onSuccess: async () => {
+          await updateSecuritySettings({ appLockEnabled: false });
+        },
+      });
+    }
   }
 
-  const isGoogleConnected = Boolean(settings?.googleEmail);
+  const biometricTitle = bioCapability.isAvailable
+    ? bioCapability.type === "FACE_ID"
+      ? "Face ID Verification"
+      : "Fingerprint Verification"
+    : "Biometric Verification";
+
+  const biometricIconName =
+    bioCapability.type === "FACE_ID" ? "scan-outline" : "finger-print";
 
   return (
-    <SafeAreaView className="flex-1 bg-dark-bg">
+    <SafeAreaView className="flex-1 bg-dark-bg" edges={["top", "bottom"]}>
       <ScreenHeader title="Settings" />
 
       <ScrollView
@@ -217,59 +204,120 @@ export default function SettingsScreen() {
         contentContainerStyle={{ paddingBottom: 40 }}
         className="flex-1 px-5 pt-5"
       >
-        {/* Profile Card (Guarded with Security Auth) */}
-        <TouchableOpacity
-          onPress={handleEditProfilePress}
-          className="bg-dark-surface p-4 rounded-3xl border border-dark-border flex-row items-center justify-between mb-5 active:bg-dark-card"
-          activeOpacity={0.7}
-        >
-          <View className="flex-row items-center gap-3.5">
-            <View className="w-12 h-12 rounded-full bg-dark-card border border-dark-border items-center justify-center overflow-hidden">
-              {settings?.profilePic ? (
-                <Image
-                  source={{ uri: settings.profilePic }}
-                  className="w-full h-full rounded-full"
-                  resizeMode="cover"
-                />
-              ) : (
-                <Text className="text-brand-accent font-bold text-lg">
-                  {settings?.userName
-                    ? settings.userName[0].toUpperCase()
-                    : "H"}
-                </Text>
-              )}
-            </View>
-
-            <View>
-              <Text className="text-dark-text font-bold text-base">
-                {settings?.userName || "Hawk User"}
-              </Text>
-              <Text className="text-dark-muted text-xs mt-0.5">
-                {settings?.googleEmail ||
-                  `${settings?.currency || "USD"} Vault`}
-              </Text>
-            </View>
-          </View>
-
-          <Ionicons name="chevron-forward" size={18} color="#60677C" />
-        </TouchableOpacity>
-
-        {/* 1. Account / Mail Section (Guarded) */}
-        <View className="bg-dark-surface rounded-2xl border border-dark-border overflow-hidden mb-4">
+        {/* Security Section */}
+        <Text className="text-dark-muted text-xs font-semibold  tracking-wider mb-2 px-1">
+          Security
+        </Text>
+        <View className="bg-dark-surface rounded-2xl border border-dark-border overflow-hidden mb-6">
+          {/* 1. Dynamic PIN Setup / Change */}
           <TouchableOpacity
-            onPress={handleGooglePress}
-            disabled={connecting}
-            className="p-4 flex-row items-center justify-between"
+            onPress={handlePinAction}
+            className="p-4 flex-row items-center justify-between border-b border-dark-border/40"
             activeOpacity={0.7}
           >
             <View className="flex-row items-center gap-3.5">
-              <Ionicons name="mail-outline" size={20} color="#94A3B8" />
+              <Ionicons name="key-outline" size={20} color="#94A3B8" />
               <View>
+                <Text className="text-dark-text font-semibold text-sm">
+                  {hasPin ? "Change Security PIN" : "Create Security PIN"}
+                </Text>
+                <Text className="text-dark-muted text-xs mt-0.5">
+                  {hasPin ? "Update your 4-digit code" : "Set up a 4-digit PIN"}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#60677C" />
+          </TouchableOpacity>
+
+          {/* 2. PIN Verification Toggle */}
+          <View className="p-4 flex-row items-center justify-between border-b border-dark-border/40">
+            <View className="flex-row items-center gap-3.5 flex-1 pr-3">
+              <Ionicons name="lock-closed-outline" size={20} color="#94A3B8" />
+              <View className="flex-1">
+                <Text className="text-dark-text font-semibold text-sm">
+                  PIN Verification
+                </Text>
+                <Text className="text-dark-muted text-xs mt-0.5">
+                  Protect app actions with PIN
+                </Text>
+              </View>
+            </View>
+            <HawkToggle value={isPinEnabled} onValueChange={handleTogglePin} />
+          </View>
+
+          {/* 3. Fingerprint / Face ID Dynamic Toggle */}
+          <View className="p-4 flex-row items-center justify-between border-b border-dark-border/40">
+            <View className="flex-row items-center gap-3.5 flex-1 pr-3">
+              <Ionicons name={biometricIconName} size={20} color="#94A3B8" />
+              <View className="flex-1">
+                <Text className="text-dark-text font-semibold text-sm">
+                  {biometricTitle}
+                </Text>
+                <Text className="text-dark-muted text-xs mt-0.5">
+                  {!bioCapability.isAvailable
+                    ? "Unavailable on this device"
+                    : !isPinEnabled
+                      ? "Requires PIN enabled"
+                      : "Quick biometric unlock"}
+                </Text>
+              </View>
+            </View>
+            <HawkToggle
+              value={Boolean(settings?.biometricsEnabled && isPinEnabled)}
+              onValueChange={handleToggleBiometrics}
+              disabled={!bioCapability.isAvailable || !isPinEnabled}
+            />
+          </View>
+
+          {/* 4. App Startup Lock Toggle */}
+          <View className="p-4 flex-row items-center justify-between">
+            <View className="flex-row items-center gap-3.5 flex-1 pr-3">
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={20}
+                color="#94A3B8"
+              />
+              <View className="flex-1">
+                <Text className="text-dark-text font-semibold text-sm">
+                  App Startup Lock
+                </Text>
+                <Text className="text-dark-muted text-xs mt-0.5">
+                  {!isPinEnabled
+                    ? "Requires PIN enabled"
+                    : "Require authentication upon launch"}
+                </Text>
+              </View>
+            </View>
+            <HawkToggle
+              value={Boolean(settings?.appLockEnabled && isPinEnabled)}
+              onValueChange={handleToggleAppLock}
+              disabled={!isPinEnabled}
+            />
+          </View>
+        </View>
+
+        {/* Backup and Restore Section */}
+        <Text className="text-dark-muted text-xs font-semibold  tracking-wider mb-2 px-1">
+          Backup & Restore
+        </Text>
+        <View className="bg-dark-surface rounded-2xl border border-dark-border overflow-hidden mb-6">
+          {/* 1. Connect Google */}
+          <TouchableOpacity
+            onPress={handleGooglePress}
+            disabled={connecting}
+            className="p-4 flex-row items-center justify-between border-b border-dark-border/40"
+            activeOpacity={0.7}
+          >
+            <View className="flex-row items-center gap-3.5 flex-1 pr-3">
+              <Ionicons name="mail-outline" size={20} color="#94A3B8" />
+              <View className="flex-1">
                 <Text className="text-dark-text font-semibold text-sm">
                   {isGoogleConnected ? "Google Account" : "Connect Google"}
                 </Text>
-                <Text className="text-dark-muted text-xs">
-                  {isGoogleConnected ? settings?.googleEmail : "Offline mode"}
+                <Text className="text-dark-muted text-xs mt-0.5">
+                  {isGoogleConnected
+                    ? settings?.googleEmail
+                    : "Connect account for cloud sync"}
                 </Text>
               </View>
             </View>
@@ -280,160 +328,27 @@ export default function SettingsScreen() {
               <Ionicons name="chevron-forward" size={18} color="#60677C" />
             )}
           </TouchableOpacity>
-        </View>
 
-        {/* 2. Security Section */}
-        <View className="bg-dark-surface rounded-2xl border border-dark-border overflow-hidden mb-4">
-          {/* Change PIN */}
+          {/* 2. Backup & Restore (Opens New Page) */}
           <TouchableOpacity
-            onPress={() => router.push("/change-pin" as any)}
-            className="p-4 flex-row items-center justify-between border-b border-dark-border/40"
-            activeOpacity={0.7}
-          >
-            <View className="flex-row items-center gap-3.5">
-              <Ionicons name="key-outline" size={20} color="#94A3B8" />
-              <Text className="text-dark-text font-semibold text-sm">
-                Change Security PIN
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#60677C" />
-          </TouchableOpacity>
-
-          {/* Biometrics Toggler (Custom HawkToggle with zero ripple) */}
-          <View className="p-4 flex-row items-center justify-between border-b border-dark-border/40">
-            <View className="flex-row items-center gap-3.5">
-              <Ionicons
-                name={
-                  bioCapability.type === "FACE_ID"
-                    ? "scan-outline"
-                    : "finger-print"
-                }
-                size={20}
-                color="#94A3B8"
-              />
-              <Text className="text-dark-text font-semibold text-sm">
-                {bioCapability.isAvailable
-                  ? `${bioCapability.label} Verification`
-                  : "Biometric Unlock"}
-              </Text>
-            </View>
-
-            <HawkToggle
-              value={Boolean(settings?.biometricsEnabled)}
-              onValueChange={handleToggleBiometrics}
-              disabled={!bioCapability.isAvailable}
-            />
-          </View>
-
-          {/* Security Permissions (Guarded with PIN) */}
-          <TouchableOpacity
-            onPress={handleOpenSecurityChecks}
+            onPress={() => router.push("/backup-restore" as any)}
             className="p-4 flex-row items-center justify-between"
             activeOpacity={0.7}
           >
-            <View className="flex-row items-center gap-3.5">
-              <Ionicons
-                name="shield-checkmark-outline"
-                size={20}
-                color="#94A3B8"
-              />
-              <Text className="text-dark-text font-semibold text-sm">
-                Security Checks
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#60677C" />
-          </TouchableOpacity>
-        </View>
-
-        {/* 3. Backup and Restore */}
-        <View className="bg-dark-surface rounded-2xl border border-dark-border overflow-hidden mb-4">
-          <TouchableOpacity
-            onPress={handleBackup}
-            className="p-4 flex-row items-center justify-between border-b border-dark-border/40"
-            activeOpacity={0.7}
-          >
-            <View className="flex-row items-center gap-3.5">
+            <View className="flex-row items-center gap-3.5 flex-1 pr-3">
               <Ionicons name="cloud-upload-outline" size={20} color="#94A3B8" />
-              <Text className="text-dark-text font-semibold text-sm">
-                Back up Database
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#60677C" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleRestore}
-            className="p-4 flex-row items-center justify-between"
-            activeOpacity={0.7}
-          >
-            <View className="flex-row items-center gap-3.5">
-              <Ionicons
-                name="cloud-download-outline"
-                size={20}
-                color="#94A3B8"
-              />
-              <Text className="text-dark-text font-semibold text-sm">
-                Restore Database
-              </Text>
+              <View className="flex-1">
+                <Text className="text-dark-text font-semibold text-sm">
+                  Backup & Restore
+                </Text>
+                <Text className="text-dark-muted text-xs mt-0.5">
+                  Cloud backup and recovery options
+                </Text>
+              </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#60677C" />
           </TouchableOpacity>
         </View>
-
-        {/* 4. Language & Theme (Placeholders) */}
-        <View className="bg-dark-surface rounded-2xl border border-dark-border overflow-hidden mb-6">
-          {/* Dark Mode */}
-          <View className="p-4 flex-row items-center justify-between border-b border-dark-border/40">
-            <View className="flex-row items-center gap-3.5">
-              <Ionicons name="moon-outline" size={20} color="#94A3B8" />
-              <Text className="text-dark-text font-semibold text-sm">
-                Dark Mode
-              </Text>
-            </View>
-            <HawkToggle
-              value={darkModePlaceholder}
-              onValueChange={setDarkModePlaceholder}
-            />
-          </View>
-
-          {/* Language */}
-          <TouchableOpacity
-            onPress={() =>
-              showAlert({
-                title: "Language",
-                message: "Additional languages coming soon.",
-                type: "info",
-              })
-            }
-            className="p-4 flex-row items-center justify-between"
-            activeOpacity={0.7}
-          >
-            <View className="flex-row items-center gap-3.5">
-              <Ionicons name="globe-outline" size={20} color="#94A3B8" />
-              <Text className="text-dark-text font-semibold text-sm">
-                Language
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-1.5">
-              <Text className="text-dark-muted text-xs font-medium">
-                English
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color="#60677C" />
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* 5. Clear Data Button (Bottom Danger Action) */}
-        <TouchableOpacity
-          onPress={handleResetData}
-          className="w-full py-4 rounded-2xl border border-brand-expense/40 bg-brand-expense/10 flex-row items-center justify-center gap-2 active:opacity-80 mb-6"
-          activeOpacity={0.8}
-        >
-          <Ionicons name="trash-outline" size={18} color="#F43F5E" />
-          <Text className="text-brand-expense font-bold text-sm">
-            Erase & Reset All Data
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

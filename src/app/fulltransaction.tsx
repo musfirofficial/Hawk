@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -38,7 +41,9 @@ interface CalendarFlyUpProps {
   periodMode: PeriodMode;
   setPeriodMode: (m: PeriodMode) => void;
   selectedDate: string;
-  onApply: (date: string) => void;
+  onApply: (date: string, mode: PeriodMode) => void;
+  onReset: () => void;
+  isApplied: boolean;
 }
 
 function CalendarFlyUp({
@@ -48,6 +53,8 @@ function CalendarFlyUp({
   setPeriodMode,
   selectedDate,
   onApply,
+  onReset,
+  isApplied,
 }: CalendarFlyUpProps) {
   const [draftDate, setDraftDate] = useState(selectedDate);
   const [draftMode, setDraftMode] = useState<PeriodMode>(periodMode);
@@ -58,11 +65,16 @@ function CalendarFlyUp({
       setDraftDate(selectedDate);
       setDraftMode(periodMode);
     }
-  }, [visible]);
+  }, [visible, selectedDate, periodMode]);
 
   function handleApply() {
     setPeriodMode(draftMode);
-    onApply(draftDate);
+    onApply(draftDate, draftMode);
+    onClose();
+  }
+
+  function handleReset() {
+    onReset();
     onClose();
   }
 
@@ -127,11 +139,22 @@ function CalendarFlyUp({
         />
       </ScrollView>
 
-      {/* Apply button */}
-      <View className="pt-3.5 pb-1 border-t border-dark-border/50">
+      {/* Action buttons */}
+      <View className="pt-3.5 pb-1 border-t border-dark-border/50 flex-row gap-3">
+        {isApplied && (
+          <TouchableOpacity
+            onPress={handleReset}
+            className="flex-1 py-4 rounded-2xl bg-dark-card border border-dark-border items-center justify-center"
+            activeOpacity={0.8}
+          >
+            <Text className="text-dark-text font-bold text-base">
+              Show All
+            </Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           onPress={handleApply}
-          className="w-full py-4 rounded-2xl bg-brand-accent items-center justify-center shadow-lg"
+          className={`${isApplied ? "flex-1" : "w-full"} py-4 rounded-2xl bg-brand-accent items-center justify-center shadow-lg`}
           activeOpacity={0.8}
         >
           <Text className="text-dark-bg font-extrabold text-base tracking-wide">
@@ -158,7 +181,14 @@ export default function FullTransactionScreen() {
 
   // Period / Calendar state
   const [periodMode, setPeriodMode] = useState<PeriodMode>("Day");
-  const [selectedDate, setSelectedDate] = useState(todayYMD); // always YYYY-MM-DD; for Month mode we use YYYY-MM prefix
+  const [selectedDate, setSelectedDate] = useState(todayYMD);
+  const [isCalendarApplied, setIsCalendarApplied] = useState(false);
+
+  // Pagination state (20 per page)
+  const PAGE_SIZE = 20;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const isLoadingMoreRef = useRef(false);
 
   const hasActiveFilters = useMemo(() => {
     return (
@@ -168,8 +198,13 @@ export default function FullTransactionScreen() {
     );
   }, [filters]);
 
-  // ── Filter & Calendar-slice transactions ───────────────────────────────────
-  const filteredTransactions = useMemo(() => {
+  // Reset pagination whenever filters or search query or calendar changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filters, isCalendarApplied, selectedDate, periodMode, searchQuery]);
+
+  // ── Card Transactions (Today stats by default; selected date/month if calendar applied) ──
+  const cardTransactions = useMemo(() => {
     return transactions.filter((t) => {
       // Hardcoded filters
       if (filters.bankAccountIds.length > 0) {
@@ -188,13 +223,61 @@ export default function FullTransactionScreen() {
         if (!filters.types.includes(t.type)) return false;
       }
 
-      // Calendar slice
-      if (periodMode === "Day") {
-        if (t.date !== selectedDate) return false;
+      // If calendar is not applied, card shows TODAY'S stats
+      if (!isCalendarApplied) {
+        if (t.date !== todayYMD) return false;
       } else {
-        // Month: selectedDate is YYYY-MM-DD, take YYYY-MM prefix
-        const monthPrefix = selectedDate.slice(0, 7);
-        if (!t.date.startsWith(monthPrefix)) return false;
+        // Calendar slice
+        if (periodMode === "Day") {
+          if (t.date !== selectedDate) return false;
+        } else {
+          const monthPrefix = selectedDate.slice(0, 7);
+          if (!t.date.startsWith(monthPrefix)) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [transactions, filters, isCalendarApplied, periodMode, selectedDate, todayYMD]);
+
+  // ── Card Period Label ─────────────────────────────────────────────────────
+  const cardPeriodLabel = useMemo(() => {
+    if (!isCalendarApplied) return "Today";
+    if (periodMode === "Day") {
+      if (selectedDate === todayYMD) return "Today";
+      return formatDisplayDate(selectedDate);
+    }
+    return formatDisplayMonth(selectedDate);
+  }, [isCalendarApplied, periodMode, selectedDate, todayYMD]);
+
+  // ── Filtered List Transactions (All transactions by default; date-sliced if calendar applied) ──
+  const filteredListTransactions = useMemo(() => {
+    return transactions.filter((t) => {
+      // Hardcoded filters
+      if (filters.bankAccountIds.length > 0) {
+        const ok =
+          (t.fromAssetId != null && filters.bankAccountIds.includes(t.fromAssetId)) ||
+          (t.toAssetId != null && filters.bankAccountIds.includes(t.toAssetId));
+        if (!ok) return false;
+      }
+      if (filters.cashAccountIds.length > 0) {
+        const ok =
+          (t.fromAssetId != null && filters.cashAccountIds.includes(t.fromAssetId)) ||
+          (t.toAssetId != null && filters.cashAccountIds.includes(t.toAssetId));
+        if (!ok) return false;
+      }
+      if (filters.types.length > 0) {
+        if (!filters.types.includes(t.type)) return false;
+      }
+
+      // Calendar slice — only when calendar is explicitly applied
+      if (isCalendarApplied) {
+        if (periodMode === "Day") {
+          if (t.date !== selectedDate) return false;
+        } else {
+          const monthPrefix = selectedDate.slice(0, 7);
+          if (!t.date.startsWith(monthPrefix)) return false;
+        }
       }
 
       // Search
@@ -213,39 +296,60 @@ export default function FullTransactionScreen() {
 
       return true;
     });
-  }, [transactions, filters, periodMode, selectedDate, searchQuery]);
+  }, [transactions, filters, isCalendarApplied, periodMode, selectedDate, searchQuery]);
 
-  // ── Group by date for Day view ─────────────────────────────────────────────
+  // ── Paginated records (first visibleCount items) ───────────────────────────
+  const pagedTransactions = useMemo(() => {
+    return filteredListTransactions.slice(0, visibleCount);
+  }, [filteredListTransactions, visibleCount]);
+
+  // ── Group paged transactions by date ──────────────────────────────────────
   const groupedByDate = useMemo(() => {
     const today = todayYMD;
     const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-    const groups: { [date: string]: TransactionItem[] } = {};
-    for (const t of filteredTransactions) {
-      if (!groups[t.date]) groups[t.date] = [];
-      groups[t.date].push(t);
+    const groupMap = new Map<string, TransactionItem[]>();
+
+    for (const t of pagedTransactions) {
+      const existing = groupMap.get(t.date);
+      if (existing) {
+        existing.push(t);
+      } else {
+        groupMap.set(t.date, [t]);
+      }
     }
-    return Object.entries(groups).map(([dateStr, items]) => {
-      let label = dateStr;
+
+    return Array.from(groupMap.entries()).map(([dateStr, items]) => {
+      let label = formatDisplayDate(dateStr);
       if (dateStr === today) label = "Today";
       else if (dateStr === yesterday) label = "Yesterday";
       return { label, dateStr, items };
     });
-  }, [filteredTransactions, todayYMD]);
+  }, [pagedTransactions, todayYMD]);
 
-  // ── Period label for summary card ─────────────────────────────────────────
-  const periodLabel = useMemo(() => {
-    if (periodMode === "Day") {
-      if (selectedDate === todayYMD) return "Today";
-      return formatDisplayDate(selectedDate);
+  // ── Load more handler ─────────────────────────────────────────────────────
+  const handleLoadMore = useCallback(() => {
+    if (isLoadingMoreRef.current) return;
+    if (visibleCount < filteredListTransactions.length) {
+      isLoadingMoreRef.current = true;
+      setIsLoadingMore(true);
+      setTimeout(() => {
+        setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, filteredListTransactions.length));
+        setIsLoadingMore(false);
+        isLoadingMoreRef.current = false;
+      }, 250);
     }
-    return formatDisplayMonth(selectedDate);
-  }, [periodMode, selectedDate, todayYMD]);
+  }, [visibleCount, filteredListTransactions.length]);
 
-  // Has calendar been shifted from today?
-  const isCalendarActive = useMemo(() => {
-    if (periodMode === "Month") return true; // month mode is always non-default
-    return selectedDate !== todayYMD;
-  }, [periodMode, selectedDate, todayYMD]);
+  // Scroll detection for infinite scrolling
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    // Trigger when user scrolls within 150px of the bottom
+    const isCloseToBottom =
+      layoutMeasurement.height + contentOffset.y >= contentSize.height - 150;
+    if (isCloseToBottom) {
+      handleLoadMore();
+    }
+  };
 
   return (
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-dark-bg">
@@ -280,11 +384,11 @@ export default function FullTransactionScreen() {
           onPress={() => setIsCalendarOpen(true)}
           activeOpacity={0.7}
           className={`w-12 h-12 rounded-2xl bg-dark-card border items-center justify-center relative ${
-            isCalendarActive ? "border-brand-accent" : "border-dark-border"
+            isCalendarApplied ? "border-brand-accent" : "border-dark-border"
           }`}
         >
           <Ionicons name="calendar-outline" size={20} color="#F8FAFC" />
-          {isCalendarActive && (
+          {isCalendarApplied && (
             <View className="w-2.5 h-2.5 rounded-full bg-brand-accent absolute top-2.5 right-2.5" />
           )}
         </TouchableOpacity>
@@ -305,17 +409,21 @@ export default function FullTransactionScreen() {
       </View>
 
       {/* Active filter reset bar */}
-      {(hasActiveFilters || isCalendarActive) && (
+      {(hasActiveFilters || isCalendarApplied || searchQuery.trim().length > 0) && (
         <View className="px-5 mb-1 flex-row items-center justify-between">
           <Text className="text-dark-muted text-xs font-semibold">
-            {filteredTransactions.length}{" "}
-            {filteredTransactions.length === 1 ? "entry" : "entries"} · {periodLabel}
+            {filteredListTransactions.length}{" "}
+            {filteredListTransactions.length === 1 ? "entry" : "entries"}
+            {isCalendarApplied ? ` · ${cardPeriodLabel}` : ""}
           </Text>
           <TouchableOpacity
             onPress={() => {
               setFilters(INITIAL_FILTER_STATE);
+              setIsCalendarApplied(false);
               setPeriodMode("Day");
               setSelectedDate(todayYMD);
+              setSearchQuery("");
+              setVisibleCount(PAGE_SIZE);
             }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -331,15 +439,17 @@ export default function FullTransactionScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 60, paddingHorizontal: 20 }}
         className="flex-1 pt-2"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
-        {/* Summary card — always shown */}
+        {/* Summary card — always shows stats (Today's by default, or filtered by selected date/month) */}
         <TransactionSummaryCard
-          transactions={filteredTransactions}
-          periodLabel={periodLabel}
+          transactions={cardTransactions}
+          periodLabel={cardPeriodLabel}
         />
 
         {/* Transaction list */}
-        {filteredTransactions.length === 0 ? (
+        {filteredListTransactions.length === 0 ? (
           <TouchableOpacity
             onPress={() => router.push("/(transaction)/create" as any)}
             activeOpacity={0.7}
@@ -352,47 +462,46 @@ export default function FullTransactionScreen() {
               No Transactions Found
             </Text>
             <Text className="text-dark-muted text-xs mt-1 text-center font-medium">
-              {hasActiveFilters || searchQuery || isCalendarActive
+              {hasActiveFilters || searchQuery || isCalendarApplied
                 ? "Try clearing filters or search term"
                 : "Tap + to record your first transaction"}
             </Text>
           </TouchableOpacity>
-        ) : periodMode === "Day" ? (
-          // Day view: grouped by date (but only 1 date in Day mode)
-          groupedByDate.map((group) => (
-            <View key={group.dateStr} className="mb-4">
-              <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-2.5 ml-1">
-                {group.label}
-              </Text>
-              <View className="space-y-3 gap-3">
-                {group.items.map((tx) => (
-                  <TransactionCard
-                    key={tx.id}
-                    transaction={tx}
-                    onPress={() => router.push(`/(transaction)/${tx.id}` as any)}
-                  />
-                ))}
-              </View>
-            </View>
-          ))
         ) : (
-          // Month view: group by individual dates
-          groupedByDate.map((group) => (
-            <View key={group.dateStr} className="mb-4">
-              <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-2.5 ml-1">
-                {group.label}
-              </Text>
-              <View className="space-y-3 gap-3">
-                {group.items.map((tx) => (
-                  <TransactionCard
-                    key={tx.id}
-                    transaction={tx}
-                    onPress={() => router.push(`/(transaction)/${tx.id}` as any)}
-                  />
-                ))}
+          <>
+            {groupedByDate.map((group) => (
+              <View key={group.dateStr} className="mb-4">
+                <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-2.5 ml-1">
+                  {group.label}
+                </Text>
+                <View className="space-y-3 gap-3">
+                  {group.items.map((tx) => (
+                    <TransactionCard
+                      key={tx.id}
+                      transaction={tx}
+                      onPress={() => router.push(`/(transaction)/${tx.id}` as any)}
+                    />
+                  ))}
+                </View>
               </View>
-            </View>
-          ))
+            ))}
+
+            {/* Infinite Scroll Spinner */}
+            {visibleCount < filteredListTransactions.length && (
+              <View className="py-6 items-center justify-center">
+                <ActivityIndicator size="small" color="#D4F938" />
+              </View>
+            )}
+
+            {filteredListTransactions.length > PAGE_SIZE &&
+              visibleCount >= filteredListTransactions.length && (
+                <View className="py-4 items-center justify-center">
+                  <Text className="text-dark-muted text-xs font-medium">
+                    All {filteredListTransactions.length} transactions loaded
+                  </Text>
+                </View>
+              )}
+          </>
         )}
       </ScrollView>
 
@@ -403,7 +512,17 @@ export default function FullTransactionScreen() {
         periodMode={periodMode}
         setPeriodMode={setPeriodMode}
         selectedDate={selectedDate}
-        onApply={setSelectedDate}
+        onApply={(date, mode) => {
+          setSelectedDate(date);
+          setPeriodMode(mode);
+          setIsCalendarApplied(true);
+        }}
+        onReset={() => {
+          setIsCalendarApplied(false);
+          setPeriodMode("Day");
+          setSelectedDate(todayYMD);
+        }}
+        isApplied={isCalendarApplied}
       />
 
       {/* Filter Fly-Up Modal */}

@@ -368,13 +368,49 @@ export function Calendar({
         /* --- MONTH PICKER VIEW --- */
         <View>
           {/* Month View Header (fixed min-height to match Day View header) */}
-          <View className="flex-row items-center justify-between mb-3 px-1 min-h-[38px]">
-            {/* Left: If full mode, back arrow to day view. If month-only, 'This Month' jump button */}
+          <View className="relative flex-row items-center justify-between mb-3 px-1 min-h-[38px]">
+            {/* Absolute Centered Year with Previous/Next Chevrons */}
+            <View
+              pointerEvents="box-none"
+              className="absolute left-0 right-0 top-0 bottom-0 items-center justify-center"
+            >
+              <View className="flex-row items-center gap-2">
+                <TouchableOpacity
+                  onPress={handlePrevYear}
+                  disabled={!canGoPrevYear}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  className={`w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border ${
+                    !canGoPrevYear ? "opacity-30" : ""
+                  }`}
+                >
+                  <Ionicons name="chevron-back" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+
+                <Text className="text-dark-text text-base font-bold tracking-tight px-1.5">
+                  {viewYear}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={handleNextYear}
+                  disabled={!canGoNextYear}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  className={`w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border ${
+                    !canGoNextYear ? "opacity-30" : ""
+                  }`}
+                >
+                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Left: If full mode, back arrow. If month-only, Reset button with no icon */}
             {mode === "full" ? (
               <TouchableOpacity
                 onPress={() => setViewType("day")}
                 activeOpacity={0.7}
-                className="w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border"
+                className="w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border z-10"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Ionicons name="arrow-back" size={16} color="#F8FAFC" />
@@ -389,49 +425,18 @@ export function Calendar({
                 }}
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                className="py-1 px-2.5 rounded-xl bg-dark-card border border-dark-border/60"
+                className="py-1 px-3 rounded-xl bg-dark-card border border-dark-border/60 z-10"
               >
                 <Text className="text-dark-textSecondary text-xs font-semibold tracking-wide">
-                  This Month
+                  Reset
                 </Text>
               </TouchableOpacity>
             ) : (
               <View style={{ width: 32 }} />
             )}
 
-            {/* Center: Year with Previous/Next Chevrons */}
-            <View className="flex-row items-center gap-2">
-              <TouchableOpacity
-                onPress={handlePrevYear}
-                disabled={!canGoPrevYear}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                className={`w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border ${
-                  !canGoPrevYear ? "opacity-30" : ""
-                }`}
-              >
-                <Ionicons name="chevron-back" size={16} color="#94A3B8" />
-              </TouchableOpacity>
-
-              <Text className="text-dark-text text-base font-bold tracking-tight px-1.5">
-                {viewYear}
-              </Text>
-
-              <TouchableOpacity
-                onPress={handleNextYear}
-                disabled={!canGoNextYear}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                className={`w-8 h-8 rounded-full items-center justify-center bg-dark-card border border-dark-border ${
-                  !canGoNextYear ? "opacity-30" : ""
-                }`}
-              >
-                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-              </TouchableOpacity>
-            </View>
-
             {/* Right: Symmetrical placeholder */}
-            <View style={{ width: mode === "full" ? 32 : 44 }} />
+            <View style={{ width: 32 }} />
           </View>
 
           {/* 12 Months Grid: Proper Aesthetic Circles across 4 Quarters with Universal Height */}
@@ -504,16 +509,16 @@ export function Calendar({
         <View>
           {/* Day View Header Row (fixed min-height matching Month View header) */}
           <View className="flex-row items-center justify-between mb-3 px-1 min-h-[38px]">
-            {/* Left: Today button */}
+            {/* Left: Reset button */}
             {showTodayButton ? (
               <TouchableOpacity
                 onPress={handleTodayPress}
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                className="py-1 px-2.5 rounded-xl bg-dark-card border border-dark-border/60"
+                className="py-1 px-3 rounded-xl bg-dark-card border border-dark-border/60"
               >
                 <Text className="text-dark-textSecondary text-xs font-semibold tracking-wide">
-                  Today
+                  Reset
                 </Text>
               </TouchableOpacity>
             ) : (

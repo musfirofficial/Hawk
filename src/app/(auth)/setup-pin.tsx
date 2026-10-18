@@ -36,6 +36,8 @@ export default function SetupPinScreen() {
       pin,
       recoveryKey,
       biometricsEnabled: false,
+      pinEnabled: true,
+      appLockEnabled: false,
     });
 
     // 2. Advance to recovery key & biometrics page cleanly
@@ -61,6 +63,8 @@ export default function SetupPinScreen() {
       pin: undefined,
       recoveryKey: undefined,
       biometricsEnabled: false,
+      pinEnabled: false,
+      appLockEnabled: false,
     });
 
     router.replace("/(tabs)");

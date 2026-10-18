@@ -7,6 +7,7 @@
     "@expo/ui": "~57.0.20",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-google-signin/google-signin": "^16.1.5",
+    "boring-avatars-vanilla": "^1.0.2",
     "drizzle-orm": "^0.45.3",
     "expo": "~57.0.25",
     "expo-clipboard": "~57.0.2",

@@ -1,5 +1,11 @@
 import { relations, sql } from "drizzle-orm";
-import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  integer,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 // ==========================================
 // Constants & Types
@@ -98,9 +104,10 @@ export const accounts = liquidAssets;
 // ==========================================
 export const contacts = sqliteTable("contacts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(),
   mobileNumber: text("mobile_number"),
   note: text("note"),
+  avatarSvg: text("avatar_svg"),
   isArchived: integer("is_archived", { mode: "boolean" })
     .default(false)
     .notNull(), // Archive instead of deleting
@@ -117,7 +124,7 @@ export const contacts = sqliteTable("contacts", {
 // ==========================================
 export const categories = sqliteTable("categories", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(), // e.g. Food, Salary, Rent
+  name: text("name").notNull().unique(), // Unique category name
   type: text("type", { enum: CATEGORY_TYPES }).default("EXPENSE").notNull(),
   icon: text("icon"), // icon name (not unique)
   createdAt: text("created_at")
@@ -198,19 +205,46 @@ export const transactions = sqliteTable("transactions", {
 });
 
 // ==========================================
-// 6. Budgets Table
+// 6. Budgets & Budget Categories Tables (M:M with allocated amount)
 // ==========================================
 export const budgets = sqliteTable("budgets", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  categoryId: integer("category_id")
-    .references(() => categories.id, { onDelete: "cascade" })
+  name: text("name").notNull(),
+  month: text("month").notNull(), // 'YYYY-MM' format, e.g. '2025-01'
+  template: integer("template", { mode: "boolean" })
+    .default(false)
     .notNull(),
-  amount: real("amount").notNull(),
-  period: text("period").default("MONTHLY").notNull(),
   createdAt: text("created_at")
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),
+  updatedAt: text("updated_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
 });
+
+export const budgetCategories = sqliteTable(
+  "budget_categories",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    budgetId: integer("budget_id")
+      .references(() => budgets.id, { onDelete: "cascade" })
+      .notNull(),
+    categoryId: integer("category_id")
+      .references(() => categories.id, { onDelete: "cascade" })
+      .notNull(),
+    month: text("month").notNull(), // 'YYYY-MM' format
+    amount: real("amount").notNull(),
+    createdAt: text("created_at")
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_budget_categories_cat_month").on(
+      table.categoryId,
+      table.month
+    ),
+  ]
+);
 
 // ==========================================
 // 7. App Settings & User Profile Table
@@ -227,7 +261,13 @@ export const appSettings = sqliteTable("app_settings", {
   profilePic: text("profile_pic"), // Local path/URI only, excluded from cloud sync
   pin: text("pin"), // 4-digit security PIN
   recoveryKey: text("recovery_key"), // 8-character reset recovery key
+  pinEnabled: integer("pin_enabled", { mode: "boolean" })
+    .default(true)
+    .notNull(),
   biometricsEnabled: integer("biometrics_enabled", { mode: "boolean" })
+    .default(false)
+    .notNull(),
+  appLockEnabled: integer("app_lock_enabled", { mode: "boolean" })
     .default(false)
     .notNull(),
   googleEmail: text("google_email"),
@@ -303,7 +343,7 @@ export const contactsRelations = relations(contacts, ({ many }) => ({
 
 export const categoriesRelations = relations(categories, ({ many }) => ({
   transactions: many(transactions),
-  budgets: many(budgets),
+  budgetCategories: many(budgetCategories),
 }));
 
 export const debtsRelations = relations(debts, ({ one, many }) => ({
@@ -339,9 +379,23 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
   }),
 }));
 
-export const budgetsRelations = relations(budgets, ({ one }) => ({
+export const budgetsRelations = relations(budgets, ({ many }) => ({
+  categories: many(budgetCategories),
+}));
+
+export const budgetCategoriesRelations = relations(budgetCategories, ({ one }) => ({
+  budget: one(budgets, {
+    fields: [budgetCategories.budgetId],
+    references: [budgets.id],
+  }),
   category: one(categories, {
-    fields: [budgets.categoryId],
+    fields: [budgetCategories.categoryId],
     references: [categories.id],
   }),
 }));
+
+export type Budget = typeof budgets.$inferSelect;
+export type NewBudget = typeof budgets.$inferInsert;
+export type BudgetCategory = typeof budgetCategories.$inferSelect;
+export type NewBudgetCategory = typeof budgetCategories.$inferInsert;
+

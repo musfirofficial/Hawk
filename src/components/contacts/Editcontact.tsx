@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { HawkModal } from "../HawkModal";
+import { ContactAvatar } from "../ContactAvatar";
 import { useAlert } from "../../context/alert";
 import { useAuth } from "../../context/auth";
 import { ContactItem, useContacts } from "../../context/contacts";
@@ -159,8 +160,18 @@ export function Editcontact({ visible, onClose, contact }: EditContactProps) {
 
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingTop: 16, paddingBottom: 24 }}
+              contentContainerStyle={{ paddingTop: 8, paddingBottom: 24 }}
             >
+              {/* Dynamic Boring Avatar Preview */}
+              <View className="items-center my-3">
+                <ContactAvatar
+                  name={name || contact.name}
+                  avatarSvg={name === contact.name ? contact.avatarSvg : null}
+                  size={80}
+                  className="border-2 border-dark-border shadow-lg"
+                />
+              </View>
+
               {/* Financial Relation Summary Card */}
               <View className="bg-dark-card border border-dark-border rounded-2xl p-4 mb-5">
                 <Text className="text-dark-muted text-xs font-semibold uppercase tracking-wider mb-1">

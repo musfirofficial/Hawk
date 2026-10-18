@@ -64,13 +64,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
   }
 
   function requireSecurityAuth(request: SecurityRequest) {
-    if (request.ruleKey && rules) {
-      const isEnabled = Boolean(rules[request.ruleKey]);
-      if (!isEnabled) {
-        // Protection is toggled OFF for this rule -> execute immediately
-        request.onSuccess();
-        return;
-      }
+    if (request.ruleKey) {
+      // Per-action security checks have been removed from the app
+      request.onSuccess();
+      return;
     }
 
     setActiveRequest(request);

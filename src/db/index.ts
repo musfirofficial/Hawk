@@ -34,9 +34,10 @@ export function ensureDatabaseInitialized() {
       );
       CREATE TABLE IF NOT EXISTS contacts (
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-        name TEXT NOT NULL,
+        name TEXT NOT NULL UNIQUE,
         mobile_number TEXT,
         note TEXT,
+        avatar_svg TEXT,
         is_archived INTEGER DEFAULT 0 NOT NULL,
         created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
         updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
@@ -70,9 +71,18 @@ export function ensureDatabaseInitialized() {
       );
       CREATE TABLE IF NOT EXISTS budgets (
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        name TEXT NOT NULL,
+        month TEXT NOT NULL,
+        template INTEGER DEFAULT 0 NOT NULL,
+        created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+        updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS budget_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        budget_id INTEGER NOT NULL,
         category_id INTEGER NOT NULL,
+        month TEXT NOT NULL,
         amount REAL NOT NULL,
-        period TEXT DEFAULT 'MONTHLY' NOT NULL,
         created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
       );
       CREATE TABLE IF NOT EXISTS app_settings (
@@ -85,7 +95,9 @@ export function ensureDatabaseInitialized() {
         profile_pic TEXT,
         pin TEXT,
         recovery_key TEXT,
+        pin_enabled INTEGER DEFAULT 1 NOT NULL,
         biometrics_enabled INTEGER DEFAULT 0 NOT NULL,
+        app_lock_enabled INTEGER DEFAULT 0 NOT NULL,
         google_email TEXT,
         google_name TEXT,
         created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
@@ -116,12 +128,30 @@ export function ensureDatabaseInitialized() {
     } catch {}
     try {
       expoDb.execSync(
+        "ALTER TABLE app_settings ADD COLUMN pin_enabled INTEGER DEFAULT 1 NOT NULL;"
+      );
+    } catch {}
+    try {
+      expoDb.execSync(
         "ALTER TABLE app_settings ADD COLUMN biometrics_enabled INTEGER DEFAULT 0 NOT NULL;"
       );
     } catch {}
     try {
       expoDb.execSync(
+        "ALTER TABLE app_settings ADD COLUMN app_lock_enabled INTEGER DEFAULT 0 NOT NULL;"
+      );
+    } catch {}
+    try {
+      expoDb.execSync(
         "ALTER TABLE debts ADD COLUMN is_archived INTEGER DEFAULT 0 NOT NULL;"
+      );
+    } catch {}
+    try {
+      expoDb.execSync("ALTER TABLE contacts ADD COLUMN avatar_svg TEXT;");
+    } catch {}
+    try {
+      expoDb.execSync(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_name ON contacts (name);"
       );
     } catch {}
 
@@ -138,6 +168,104 @@ export function ensureDatabaseInitialized() {
       }
     } catch (err) {
       console.warn("Categories type column migration warning:", err);
+    }
+
+    // Ensure budgets and budget_categories tables schema migration
+    try {
+      expoDb.execSync(`
+        CREATE TABLE IF NOT EXISTS budget_categories (
+          id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          budget_id INTEGER NOT NULL,
+          category_id INTEGER NOT NULL,
+          month TEXT NOT NULL,
+          amount REAL NOT NULL,
+          created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+        );
+      `);
+
+      const budgetCols = expoDb.getAllSync<{ name: string }>(
+        "PRAGMA table_info(budgets);"
+      );
+      const colNames = new Set(budgetCols.map((c) => c.name));
+      if (!colNames.has("name")) {
+        expoDb.execSync(
+          "ALTER TABLE budgets ADD COLUMN name TEXT DEFAULT 'Monthly Budget' NOT NULL;"
+        );
+      }
+      if (!colNames.has("month")) {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        expoDb.execSync(
+          `ALTER TABLE budgets ADD COLUMN month TEXT DEFAULT '${currentMonth}' NOT NULL;`
+        );
+      }
+      if (!colNames.has("updated_at")) {
+        expoDb.execSync(
+          "ALTER TABLE budgets ADD COLUMN updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL;"
+        );
+      }
+      if (!colNames.has("template")) {
+        expoDb.execSync(
+          "ALTER TABLE budgets ADD COLUMN template INTEGER DEFAULT 0 NOT NULL;"
+        );
+      }
+
+      // Check budget_categories columns
+      const bcCols = expoDb.getAllSync<{ name: string }>(
+        "PRAGMA table_info(budget_categories);"
+      );
+      const bcColNames = new Set(bcCols.map((c) => c.name));
+      if (!bcColNames.has("month")) {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        expoDb.execSync(
+          `ALTER TABLE budget_categories ADD COLUMN month TEXT DEFAULT '${currentMonth}' NOT NULL;`
+        );
+      }
+
+      // Sync month from budgets if missing
+      try {
+        expoDb.execSync(`
+          UPDATE budget_categories SET month = (
+            SELECT month FROM budgets WHERE budgets.id = budget_categories.budget_id
+          ) WHERE month IS NULL OR month = '';
+        `);
+      } catch {}
+
+      // Clean up any orphan budget_categories rows without a valid budget
+      try {
+        expoDb.execSync(`
+          DELETE FROM budget_categories WHERE budget_id NOT IN (SELECT id FROM budgets);
+        `);
+      } catch {}
+
+      // Unique index: a category cannot be assigned to multiple budgets in the same month
+      try {
+        expoDb.execSync(
+          "CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_category_month ON budget_categories(category_id, month);"
+        );
+      } catch {}
+
+      // Unique index on category name
+      try {
+        expoDb.execSync(
+          "CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_name ON categories(name);"
+        );
+      } catch {}
+
+      // If legacy budgets had category_id and amount, migrate rows into budget_categories
+      if (colNames.has("category_id") && colNames.has("amount")) {
+        const existingCount = expoDb.getFirstSync<{ cnt: number }>(
+          "SELECT COUNT(*) as cnt FROM budget_categories;"
+        );
+        if (!existingCount || existingCount.cnt === 0) {
+          const currentMonth = new Date().toISOString().slice(0, 7);
+          expoDb.execSync(`
+            INSERT INTO budget_categories (budget_id, category_id, month, amount)
+            SELECT id, category_id, COALESCE(month, '${currentMonth}'), amount FROM budgets WHERE category_id IS NOT NULL AND amount IS NOT NULL;
+          `);
+        }
+      }
+    } catch (err) {
+      console.warn("Budgets schema migration warning:", err);
     }
 
     // Ensure single-row security_rules record exists

@@ -2,29 +2,64 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useRef, useState } from "react";
 import {
   FlatList,
+  Platform,
   Text,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from "react-native";
+import Svg, { Circle, G } from "react-native-svg";
 import { useAuth } from "../../context/auth";
 import { TransactionItem } from "../../context/transactions";
 import { formatCurrency } from "../../services/currency";
+
+// Font styles to guarantee DMSans loads across all Android and iOS engines
+const fonts = {
+  regular: { fontFamily: "DMSans_400Regular", fontWeight: "normal" as const },
+  medium: { fontFamily: "DMSans_500Medium", fontWeight: "normal" as const },
+  semibold: { fontFamily: "DMSans_600SemiBold", fontWeight: "normal" as const },
+  bold: { fontFamily: "DMSans_700Bold", fontWeight: "normal" as const },
+  extrabold: {
+    fontFamily: "DMSans_800ExtraBold",
+    fontWeight: "normal" as const,
+  },
+};
 
 // ─── Dual-ring Pie ────────────────────────────────────────────────────────────
 function DualRingPie({
   incomePercent,
   expensePercent,
-  size = 72,
+  size = 68,
 }: {
   incomePercent: number;
   expensePercent: number;
   size?: number;
 }) {
-  const stroke = Math.round(size * 0.11);
-  const totalPercent = Math.min(incomePercent + expensePercent, 100);
-  const incPct = totalPercent > 0 ? (incomePercent / totalPercent) * 100 : 0;
-  const expPct = totalPercent > 0 ? (expensePercent / totalPercent) * 100 : 0;
+  const stroke = Math.round(size * 0.12); // ~8px
+  const center = size / 2;
+  // Inset radius slightly so strokeLinecap="round" ends never get clipped by the SVG boundary
+  const radius = (size - stroke - 6) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  const total = incomePercent + expensePercent;
+  const incFrac = total > 0 ? incomePercent / total : 0;
+  const expFrac = total > 0 ? expensePercent / total : 0;
+
+  const hasBoth = incFrac > 0 && expFrac > 0;
+  // Distinct spacing between segments to let both circular rounded caps be clearly visible
+  const gap = hasBoth ? stroke * 1.5 : 0;
+  const totalGaps = hasBoth ? gap * 2 : 0;
+  const availableCircumference = circumference - totalGaps;
+
+  const incLength = hasBoth
+    ? Math.max(stroke, incFrac * availableCircumference)
+    : incFrac * circumference;
+  const expLength = hasBoth
+    ? Math.max(stroke, expFrac * availableCircumference)
+    : expFrac * circumference;
+
+  const incOffset = hasBoth ? -gap / 2 : 0;
+  const expOffset = hasBoth ? -(gap / 2 + incLength + gap) : 0;
 
   return (
     <View
@@ -35,78 +70,67 @@ function DualRingPie({
         justifyContent: "center",
       }}
     >
-      {/* Background ring */}
-      <View
-        style={{
-          position: "absolute",
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: stroke,
-          borderColor: "#262B3A",
-        }}
-      />
-
-      {/* Expense arc (red) */}
-      {expPct > 0 && (
-        <View
-          style={{
-            position: "absolute",
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            borderWidth: stroke,
-            borderColor: "#F43F5E",
-            borderTopColor: "transparent",
-            borderRightColor: expPct > 50 ? "#F43F5E" : "transparent",
-            borderBottomColor: "#F43F5E",
-            borderLeftColor: expPct > 75 ? "#F43F5E" : "transparent",
-            transform: [{ rotate: `${-90 + (incPct / 100) * 360}deg` }],
-          }}
+      <Svg width={size} height={size}>
+        {/* Dark background track ring */}
+        <Circle
+          cx={center}
+          cy={center}
+          r={radius}
+          stroke="#262B3A"
+          strokeWidth={stroke}
+          fill="none"
         />
-      )}
 
-      {/* Income arc (green) */}
-      {incPct > 0 && (
-        <View
-          style={{
-            position: "absolute",
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            borderWidth: stroke,
-            borderColor: "#22C55E",
-            borderTopColor: "#22C55E",
-            borderRightColor: incPct > 25 ? "#22C55E" : "transparent",
-            borderBottomColor: incPct > 50 ? "#22C55E" : "transparent",
-            borderLeftColor: incPct > 75 ? "#22C55E" : "transparent",
-            transform: [{ rotate: "-90deg" }],
-          }}
-        />
-      )}
+        <G rotation={-90} origin={`${center}, ${center}`}>
+          {/* Income arc (Green) with circular rounded caps */}
+          {incFrac >= 0.999 ? (
+            <Circle
+              cx={center}
+              cy={center}
+              r={radius}
+              stroke="#22C55E"
+              strokeWidth={stroke}
+              fill="none"
+            />
+          ) : incFrac > 0 ? (
+            <Circle
+              cx={center}
+              cy={center}
+              r={radius}
+              stroke="#22C55E"
+              strokeWidth={stroke}
+              strokeDasharray={`${incLength} ${circumference}`}
+              strokeDashoffset={incOffset}
+              strokeLinecap="round"
+              fill="none"
+            />
+          ) : null}
 
-      {/* Center label */}
-      <View style={{ alignItems: "center" }}>
-        <Text
-          style={{
-            color: "#F8FAFC",
-            fontSize: Math.round(size * 0.17),
-            fontFamily: "DMSans_700Bold",
-            lineHeight: Math.round(size * 0.22),
-          }}
-        >
-          {Math.round(expensePercent)}%
-        </Text>
-        <Text
-          style={{
-            color: "#60677C",
-            fontSize: Math.round(size * 0.13),
-            fontFamily: "DMSans_500Medium",
-          }}
-        >
-          exp
-        </Text>
-      </View>
+          {/* Expense arc (Red) with circular rounded caps */}
+          {expFrac >= 0.999 ? (
+            <Circle
+              cx={center}
+              cy={center}
+              r={radius}
+              stroke="#F43F5E"
+              strokeWidth={stroke}
+              fill="none"
+            />
+          ) : expFrac > 0 ? (
+            <Circle
+              cx={center}
+              cy={center}
+              r={radius}
+              stroke="#F43F5E"
+              strokeWidth={stroke}
+              strokeDasharray={`${expLength} ${circumference}`}
+              strokeDashoffset={expOffset}
+              strokeLinecap="round"
+              fill="none"
+            />
+          ) : null}
+        </G>
+      </Svg>
     </View>
   );
 }
@@ -122,55 +146,33 @@ function CategoryBar({
   isIncome: boolean;
 }) {
   const barColor = isIncome ? "#22C55E" : "#F43F5E";
-  const truncated = name.length > 14 ? name.slice(0, 13) + "…" : name;
+  const truncated = name.length > 18 ? name.slice(0, 17) + "…" : name;
   return (
-    <View style={{ marginBottom: 10 }}>
-      <View
-        style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}
-      >
+    <View className="mb-2.5">
+      <View className="flex-row items-center mb-1">
         <Ionicons
           name={isIncome ? "arrow-up-outline" : "arrow-down-outline"}
           size={12}
           color={barColor}
         />
         <Text
-          style={{
-            color: "#F8FAFC",
-            fontSize: 12,
-            fontFamily: "DMSans_600SemiBold",
-            marginLeft: 4,
-            flex: 1,
-          }}
+          className="text-dark-text font-semibold text-xs ml-1 flex-1"
           numberOfLines={1}
+          style={fonts.semibold}
         >
           {truncated}
         </Text>
         <Text
-          style={{
-            color: "#60677C",
-            fontSize: 11,
-            fontFamily: "DMSans_500Medium",
-            marginLeft: 8,
-          }}
+          className="text-dark-muted font-medium text-[11px] ml-2"
+          style={fonts.medium}
         >
           {Math.round(pct)}%
         </Text>
       </View>
-      <View
-        style={{
-          height: 4,
-          backgroundColor: "#262B3A",
-          borderRadius: 2,
-          overflow: "hidden",
-        }}
-      >
+      <View className="h-1 bg-dark-border rounded-full overflow-hidden">
         <View
-          style={{
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: barColor,
-            width: `${Math.min(pct, 100)}%`,
-          }}
+          className={`h-1 rounded-full ${isIncome ? "bg-brand-income" : "bg-brand-expense"}`}
+          style={{ width: `${Math.min(pct, 100)}%` }}
         />
       </View>
     </View>
@@ -213,10 +215,10 @@ export function TransactionSummaryCard({
 }: TransactionSummaryCardProps) {
   const { settings } = useAuth();
   const { width } = useWindowDimensions();
-  const cardWidth = width - 40;
 
   const [expanded, setExpanded] = useState(false);
   const [activePage, setActivePage] = useState(0);
+  const [pageWidth, setPageWidth] = useState(Math.max(200, width - 72));
   const flatRef = useRef<FlatList>(null);
 
   const stats = useMemo(() => {
@@ -289,92 +291,57 @@ export function TransactionSummaryCard({
   const fmt = settings?.numberFormat;
 
   return (
-    <View
-      style={{
-        backgroundColor: "#141720",
-        borderWidth: 1,
-        borderColor: "#262B3A",
-        borderRadius: 20,
-        marginBottom: 12,
-        overflow: "hidden",
-      }}
-    >
+    <View className="bg-dark-surface border border-dark-border rounded-2xl mb-3 overflow-hidden">
       {/* ── Collapsed header ── */}
-      <View style={{ padding: 16 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            marginBottom: 8,
-          }}
-        >
+      <View className="p-4">
+        {/* Top row: Period label & View logs button with proper spacing */}
+        <View className="flex-row items-center justify-between mb-3">
           <Text
-            style={{
-              color: "#60677C",
-              fontSize: 11,
-              fontFamily: "DMSans_700Bold",
-              textTransform: "uppercase",
-              letterSpacing: 0.8,
-            }}
+            className="text-dark-muted font-bold text-[11px] uppercase tracking-wider flex-1 mr-2"
+            numberOfLines={1}
+            style={fonts.bold}
           >
             {periodLabel}
           </Text>
           <TouchableOpacity
             onPress={() => setExpanded((v) => !v)}
             activeOpacity={0.7}
-            style={{
-              backgroundColor: "#1B1F2B",
-              borderRadius: 20,
-              paddingHorizontal: 14,
-              paddingVertical: 6,
-              borderWidth: 1,
-              borderColor: "#262B3A",
-            }}
+            className="bg-dark-card border border-dark-border rounded-full px-3.5 py-1.5"
           >
             <Text
-              style={{
-                color: "#F8FAFC",
-                fontSize: 12,
-                fontFamily: "DMSans_600SemiBold",
-              }}
+              className="text-dark-text font-semibold text-xs"
+              style={fonts.semibold}
             >
               {expanded ? "Hide logs" : "View logs"}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Net amount + pie */}
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View style={{ flex: 1, paddingRight: 12 }}>
+        {/* Net amount on left + clean circular donut pie on right */}
+        <View className="flex-row items-center justify-between">
+          <View className="flex-1 pr-3">
             <Text
-              style={{
-                color: stats.net >= 0 ? "#22C55E" : "#F43F5E",
-                fontSize: 34,
-                fontFamily: "DMSans_800ExtraBold",
-                lineHeight: 40,
-              }}
+              className={`text-[32px] leading-9 font-extrabold ${
+                stats.net >= 0 ? "text-brand-income" : "text-brand-expense"
+              }`}
               numberOfLines={1}
               adjustsFontSizeToFit
+              style={fonts.extrabold}
             >
               {stats.net < 0 ? "-" : "+"}
               {formatCurrency(Math.abs(stats.net), curr, fmt)}
             </Text>
             <Text
-              style={{
-                color: "#60677C",
-                fontSize: 11,
-                fontFamily: "DMSans_500Medium",
-                marginTop: 2,
-              }}
+              className="text-dark-muted font-medium text-[11px] mt-1"
+              style={fonts.medium}
             >
-              Income − Expense
+              Net Saving
             </Text>
           </View>
           <DualRingPie
             incomePercent={stats.incPct}
             expensePercent={stats.expPct}
-            size={72}
+            size={68}
           />
         </View>
       </View>
@@ -382,71 +349,50 @@ export function TransactionSummaryCard({
       {/* ── Expanded section ── */}
       {expanded && (
         <>
-          <View style={{ height: 1, backgroundColor: "#262B3A" }} />
-          <View style={{ padding: 16 }}>
+          <View className="h-[1px] bg-dark-border" />
+          <View className="p-4">
             {/* Tx count + Income + Expense */}
-            <View style={{ flexDirection: "row", marginBottom: 18, gap: 16 }}>
-              <View style={{ flex: 1 }}>
+            <View className="flex-row mb-4 gap-4">
+              <View className="flex-1">
                 <Text
-                  style={{
-                    color: "#60677C",
-                    fontSize: 11,
-                    fontFamily: "DMSans_500Medium",
-                    marginBottom: 2,
-                  }}
+                  className="text-dark-muted font-medium text-[11px] mb-0.5"
+                  style={fonts.medium}
                 >
                   Transactions
                 </Text>
                 <Text
-                  style={{
-                    color: "#F8FAFC",
-                    fontSize: 18,
-                    fontFamily: "DMSans_700Bold",
-                  }}
+                  className="text-dark-text font-bold text-lg"
+                  style={fonts.bold}
                 >
                   {stats.txCount}
                 </Text>
               </View>
-              <View style={{ flex: 1 }}>
+              <View className="flex-1">
                 <Text
-                  style={{
-                    color: "#60677C",
-                    fontSize: 11,
-                    fontFamily: "DMSans_500Medium",
-                    marginBottom: 2,
-                  }}
+                  className="text-dark-muted font-medium text-[11px] mb-0.5"
+                  style={fonts.medium}
                 >
                   Income
                 </Text>
                 <Text
-                  style={{
-                    color: "#22C55E",
-                    fontSize: 14,
-                    fontFamily: "DMSans_700Bold",
-                  }}
+                  className="text-brand-income font-bold text-sm"
                   numberOfLines={1}
+                  style={fonts.bold}
                 >
                   +{formatCurrency(stats.totalIncome, curr, fmt)}
                 </Text>
               </View>
-              <View style={{ flex: 1 }}>
+              <View className="flex-1">
                 <Text
-                  style={{
-                    color: "#60677C",
-                    fontSize: 11,
-                    fontFamily: "DMSans_500Medium",
-                    marginBottom: 2,
-                  }}
+                  className="text-dark-muted font-medium text-[11px] mb-0.5"
+                  style={fonts.medium}
                 >
                   Expense
                 </Text>
                 <Text
-                  style={{
-                    color: "#F43F5E",
-                    fontSize: 14,
-                    fontFamily: "DMSans_700Bold",
-                  }}
+                  className="text-brand-expense font-bold text-sm"
                   numberOfLines={1}
+                  style={fonts.bold}
                 >
                   -{formatCurrency(stats.totalExpense, curr, fmt)}
                 </Text>
@@ -457,74 +403,76 @@ export function TransactionSummaryCard({
             {stats.categories.length > 0 && (
               <>
                 <Text
-                  style={{
-                    color: "#60677C",
-                    fontSize: 11,
-                    fontFamily: "DMSans_700Bold",
-                    letterSpacing: 0.8,
-                    marginBottom: 12,
-                  }}
+                  className="text-dark-muted font-bold text-[11px]  tracking-wider mb-3"
+                  style={fonts.bold}
                 >
-                  Category wise summary
+                  Category Wise Summary
                 </Text>
 
                 {categoryPages.length === 1 ? (
                   <CategoryPageCard items={categoryPages[0]} />
                 ) : (
-                  <>
+                  <View
+                    onLayout={(e) => {
+                      const measuredWidth = Math.round(
+                        e.nativeEvent.layout.width,
+                      );
+                      if (measuredWidth > 0 && measuredWidth !== pageWidth) {
+                        setPageWidth(measuredWidth);
+                      }
+                    }}
+                  >
                     <FlatList
                       ref={flatRef}
                       data={categoryPages}
                       horizontal
-                      pagingEnabled
+                      pagingEnabled={Platform.OS === "ios"}
+                      snapToInterval={pageWidth}
+                      snapToAlignment="start"
+                      decelerationRate="fast"
                       showsHorizontalScrollIndicator={false}
                       keyExtractor={(_, i) => String(i)}
+                      getItemLayout={(_, index) => ({
+                        length: pageWidth,
+                        offset: pageWidth * index,
+                        index,
+                      })}
                       onMomentumScrollEnd={(e) => {
-                        setActivePage(
-                          Math.round(e.nativeEvent.contentOffset.x / cardWidth),
-                        );
+                        if (pageWidth > 0) {
+                          setActivePage(
+                            Math.round(
+                              e.nativeEvent.contentOffset.x / pageWidth,
+                            ),
+                          );
+                        }
                       }}
                       renderItem={({ item }) => (
-                        <View style={{ width: cardWidth - 32 }}>
+                        <View style={{ width: pageWidth }}>
                           <CategoryPageCard items={item} />
                         </View>
                       )}
                     />
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "center",
-                        marginTop: 10,
-                        gap: 5,
-                      }}
-                    >
+                    <View className="flex-row justify-center mt-3 gap-1.5 items-center">
                       {categoryPages.map((_, i) => (
                         <View
                           key={i}
-                          style={{
-                            width: i === activePage ? 16 : 6,
-                            height: 6,
-                            borderRadius: 3,
-                            backgroundColor:
-                              i === activePage ? "#F8FAFC" : "#262B3A",
-                          }}
+                          className={`h-1.5 rounded-full ${
+                            i === activePage
+                              ? "w-4 bg-dark-text"
+                              : "w-1.5 bg-dark-border"
+                          }`}
                         />
                       ))}
                     </View>
-                  </>
+                  </View>
                 )}
               </>
             )}
 
             {stats.categories.length === 0 && (
               <Text
-                style={{
-                  color: "#60677C",
-                  fontSize: 12,
-                  fontFamily: "DMSans_500Medium",
-                  textAlign: "center",
-                  paddingVertical: 8,
-                }}
+                className="text-dark-muted font-medium text-xs text-center py-2"
+                style={fonts.medium}
               >
                 No categorised transactions in this period.
               </Text>

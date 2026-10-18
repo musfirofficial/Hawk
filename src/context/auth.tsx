@@ -40,11 +40,15 @@ interface AuthContextType {
     pin?: string;
     recoveryKey?: string;
     biometricsEnabled?: boolean;
+    pinEnabled?: boolean;
+    appLockEnabled?: boolean;
   }) => Promise<void>;
   updateSecuritySettings: (params: {
     pin?: string;
     recoveryKey?: string;
     biometricsEnabled?: boolean;
+    pinEnabled?: boolean;
+    appLockEnabled?: boolean;
   }) => Promise<void>;
   disconnectGoogle: () => Promise<void>;
   reloadSettings: () => void;
@@ -125,6 +129,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     pin?: string;
     recoveryKey?: string;
     biometricsEnabled?: boolean;
+    pinEnabled?: boolean;
+    appLockEnabled?: boolean;
   }) {
     try {
       ensureDatabaseInitialized();
@@ -132,6 +138,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const googleEmail = pendingGoogleUser?.email || null;
       const googleName = pendingGoogleUser?.name || null;
+
+      const hasPin = Boolean(params.pin);
+      const defaultPinEnabled = params.pinEnabled !== undefined ? params.pinEnabled : hasPin;
 
       if (existing.length > 0) {
         db.update(schema.appSettings)
@@ -145,10 +154,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               params.recoveryKey !== undefined
                 ? params.recoveryKey
                 : existing[0].recoveryKey,
+            pinEnabled:
+              params.pinEnabled !== undefined
+                ? params.pinEnabled
+                : existing[0].pinEnabled ?? defaultPinEnabled,
             biometricsEnabled:
               params.biometricsEnabled !== undefined
                 ? params.biometricsEnabled
                 : existing[0].biometricsEnabled,
+            appLockEnabled:
+              params.appLockEnabled !== undefined
+                ? params.appLockEnabled
+                : existing[0].appLockEnabled ?? false,
             googleEmail: googleEmail || existing[0].googleEmail,
             googleName: googleName || existing[0].googleName,
             hasOnboarded: true,
@@ -165,7 +182,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             profilePic: params.profilePic || null,
             pin: params.pin || null,
             recoveryKey: params.recoveryKey || null,
+            pinEnabled: defaultPinEnabled,
             biometricsEnabled: params.biometricsEnabled || false,
+            appLockEnabled: params.appLockEnabled || false,
             googleEmail,
             googleName,
             hasOnboarded: true,
@@ -181,11 +200,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Update Security Settings (PIN and/or Biometrics / Recovery Key)
+  // Update Security Settings (PIN, Biometrics, Recovery Key, App Lock)
   async function updateSecuritySettings(params: {
     pin?: string;
     recoveryKey?: string;
     biometricsEnabled?: boolean;
+    pinEnabled?: boolean;
+    appLockEnabled?: boolean;
   }) {
     try {
       ensureDatabaseInitialized();
@@ -199,6 +220,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }),
             ...(params.biometricsEnabled !== undefined && {
               biometricsEnabled: params.biometricsEnabled,
+            }),
+            ...(params.pinEnabled !== undefined && {
+              pinEnabled: params.pinEnabled,
+            }),
+            ...(params.appLockEnabled !== undefined && {
+              appLockEnabled: params.appLockEnabled,
             }),
             updatedAt: new Date().toISOString(),
           })
