@@ -19,6 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../context/auth";
 import { BiometricAuthType } from "../services/biometrics";
 import { HawkModal } from "./HawkModal";
+import { SafeTouchable } from "./common/SafeTouchable";
 
 export interface SetUpPinHandle {
   handleBack: () => boolean;
@@ -486,18 +487,20 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
 
           {showResetPin && step === "CURRENT" && (
             <TouchableOpacity
+              disabled={isResetModalVisible}
               onPress={() => {
+                if (isResetModalVisible) return;
                 setResetCode("");
                 setResetError(null);
                 setIsResetSuccess(false);
                 setIsResetModalVisible(true);
               }}
               delayPressIn={0}
-              hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}
-              className="py-2.5 px-4"
-              activeOpacity={0.7}
+              hitSlop={{ top: 20, bottom: 20, left: 30, right: 30 }}
+              className="py-2.5 px-4 items-center justify-center"
+              activeOpacity={0.6}
             >
-              <Text className="text-dark-muted active:text-dark-text text-sm font-medium underline">
+              <Text className="text-dark-muted text-sm font-medium underline">
                 Reset PIN
               </Text>
             </TouchableOpacity>

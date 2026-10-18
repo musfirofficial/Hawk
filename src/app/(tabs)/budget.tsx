@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
+import { useSafeRouter } from "../../hooks/useSafeRouter";
 import { addDatabaseChangeListener } from "expo-sqlite";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -30,7 +31,7 @@ import {
 import { formatCurrency, getCurrencySymbol } from "../../services/currency";
 
 export default function BudgetScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const { settings } = useAuth();
   const { categories } = useCategories();
   const { showAlert, showConfirm } = useAlert();

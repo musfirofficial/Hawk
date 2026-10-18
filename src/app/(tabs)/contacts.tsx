@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useSafeRouter } from "../../hooks/useSafeRouter";
 import { useMemo, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -9,7 +9,7 @@ import { Editcontact } from "../../components/contacts/Editcontact";
 import { ContactItem, useContacts } from "../../context/contacts";
 
 export default function ContactsScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const { contacts } = useContacts();
 
   const [search, setSearch] = useState("");

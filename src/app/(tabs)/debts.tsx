@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useSafeRouter } from "../../hooks/useSafeRouter";
 import React, { useMemo, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,7 +10,7 @@ import { DebtItem, useDebts } from "../../context/debts";
 import { formatCurrency } from "../../services/currency";
 
 export default function DebtsScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const {
     debts,
     totalLentRemaining,
@@ -43,6 +43,7 @@ export default function DebtsScreen() {
     <SafeAreaView edges={["top"]} className="flex-1 bg-dark-bg">
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: 110 }}
         className="flex-1 px-5 pt-3"
       >
@@ -175,10 +176,12 @@ export default function DebtsScreen() {
           </Text>
           <TouchableOpacity
             onPress={() => router.push("/alldebts" as any)}
-            activeOpacity={0.7}
+            hitSlop={{ top: 14, bottom: 14, left: 20, right: 20 }}
+            delayPressIn={0}
+            activeOpacity={0.6}
             className="py-1 px-2 -mr-2"
           >
-            <Text className="text-dark-muted active:text-dark-text text-xs font-semibold">
+            <Text className="text-dark-muted text-xs font-semibold">
               View all
             </Text>
           </TouchableOpacity>

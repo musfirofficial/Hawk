@@ -83,17 +83,11 @@ function CalendarFlyUp({
       visible={visible}
       onClose={onClose}
       title="Pick date"
-      maxHeight="92%"
-      style={{ height: "92%" }}
       avoidKeyboard={false}
     >
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: 8, paddingBottom: 24 }}
-        className="flex-1 px-1"
-      >
+      <View className="px-1 pb-2">
         {/* Period Toggle: Day / Month */}
-        <View className="bg-dark-surface p-1 rounded-2xl flex-row items-center border border-dark-border mb-5">
+        <View className="bg-dark-surface p-1 rounded-2xl flex-row items-center border border-dark-border mb-4">
           {(["Day", "Month"] as const).map((m) => {
             const isActive = draftMode === m;
             return (
@@ -137,30 +131,30 @@ function CalendarFlyUp({
           mode={draftMode === "Month" ? "month-only" : "full"}
           className="mb-4"
         />
-      </ScrollView>
 
-      {/* Action buttons */}
-      <View className="pt-3.5 pb-1 border-t border-dark-border/50 flex-row gap-3">
-        {isApplied && (
+        {/* Action buttons */}
+        <View className="pt-2 flex-row gap-3">
+          {isApplied && (
+            <TouchableOpacity
+              onPress={handleReset}
+              className="flex-1 py-4 rounded-2xl bg-dark-card border border-dark-border items-center justify-center"
+              activeOpacity={0.8}
+            >
+              <Text className="text-dark-text font-bold text-base">
+                Show All
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
-            onPress={handleReset}
-            className="flex-1 py-4 rounded-2xl bg-dark-card border border-dark-border items-center justify-center"
+            onPress={handleApply}
+            className={`${isApplied ? "flex-1" : "w-full"} py-4 rounded-2xl bg-brand-accent items-center justify-center shadow-lg`}
             activeOpacity={0.8}
           >
-            <Text className="text-dark-text font-bold text-base">
-              Show All
+            <Text className="text-dark-bg font-extrabold text-base tracking-wide">
+              Apply
             </Text>
           </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          onPress={handleApply}
-          className={`${isApplied ? "flex-1" : "w-full"} py-4 rounded-2xl bg-brand-accent items-center justify-center shadow-lg`}
-          activeOpacity={0.8}
-        >
-          <Text className="text-dark-bg font-extrabold text-base tracking-wide">
-            Apply
-          </Text>
-        </TouchableOpacity>
+        </View>
       </View>
     </HawkFlyUp>
   );

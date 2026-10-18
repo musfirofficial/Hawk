@@ -12,7 +12,7 @@ import {
 } from "@expo-google-fonts/dm-sans";
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect } from "react";
-import { ActivityIndicator, Platform, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, LogBox, Platform, Text, TextInput, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AccountsProvider } from "../context/accounts";
 import { AlertProvider } from "../context/alert";
@@ -23,6 +23,11 @@ import { DebtsProvider } from "../context/debts";
 import { SecurityProvider } from "../context/security";
 import { TransactionsProvider } from "../context/transactions";
 import "../../global.css";
+
+// Ignore known upstream React 19 Fabric timing warning from expo-router useLinking during initial launch
+LogBox.ignoreLogs([
+  "Can't perform a React state update on a component that hasn't mounted yet",
+]);
 
 // Prevent splash screen from auto-hiding until fonts are loaded
 SplashScreen.preventAutoHideAsync().catch(() => {});

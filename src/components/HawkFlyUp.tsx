@@ -88,9 +88,12 @@ export function HawkFlyUp({
     };
   }, [avoidKeyboard]);
 
+  const isClosingRef = useRef(false);
+
   // Reset drag position on open and clear keyboard offset on close
   useEffect(() => {
     if (visible) {
+      isClosingRef.current = false;
       panY.setValue(0);
     } else {
       setKeyboardHeight(0);
@@ -106,12 +109,15 @@ export function HawkFlyUp({
   };
 
   const closeFlyUp = () => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
     Animated.timing(panY, {
       toValue: 500,
       duration: 180,
       useNativeDriver: true,
     }).start(() => {
       panY.setValue(0);
+      isClosingRef.current = false;
       onClose();
     });
   };

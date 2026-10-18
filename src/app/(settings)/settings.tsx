@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { eq } from "drizzle-orm";
-import { useRouter } from "expo-router";
+import { useSafeRouter } from "../../hooks/useSafeRouter";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,7 +24,7 @@ import {
 } from "../../services/biometrics";
 
 export default function SettingsScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const { showAlert, showConfirm } = useAlert();
   const {
     settings,

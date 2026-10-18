@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useSafeRouter } from "../../hooks/useSafeRouter";
 import { useMemo, useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,7 +11,7 @@ import { useTransactions } from "../../context/transactions";
 import { formatCurrency } from "../../services/currency";
 
 export default function HomeScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const { settings } = useAuth();
   const { totalLiquidAssets, totalBankBalance, totalCashBalance } =
     useAccounts();
