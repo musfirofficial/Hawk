@@ -188,6 +188,13 @@ function NavigationGate() {
             presentation: "card",
           }}
         />
+        <Stack.Screen
+          name="debt/[id]"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
         <Stack.Screen name="(transaction)" options={{ headerShown: false }} />
         <Stack.Screen name="(account)" options={{ headerShown: false }} />
       </Stack>

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import React, {
   createContext,
   useCallback,
@@ -53,7 +53,7 @@ interface AccountsContextType {
   refreshAccounts: () => void;
   createAccount: (data: CreateAccountInput) => Promise<void>;
   updateAccount: (id: number, data: UpdateAccountInput) => Promise<void>;
-  deleteAccount: (id: number) => Promise<{ archived: boolean }>;
+  deleteAccount: (id: number, force?: boolean) => Promise<{ archived: boolean }>;
 }
 
 const AccountsContext = createContext<AccountsContextType | undefined>(
@@ -206,8 +206,28 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
    * - If account HAS past transactions: Soft Delete (Archive) to preserve ledger history.
    */
   const deleteAccount = useCallback(
-    async (id: number): Promise<{ archived: boolean }> => {
+    async (id: number, force?: boolean): Promise<{ archived: boolean }> => {
       ensureDatabaseInitialized();
+
+      if (force) {
+        // Force delete: clean up linked transactions first to avoid foreign key constraints
+        db.delete(schema.transactions)
+          .where(
+            or(
+              eq(schema.transactions.fromAssetId, id),
+              eq(schema.transactions.toAssetId, id)
+            )
+          )
+          .run();
+
+        // Permanently delete account record
+        db.delete(schema.liquidAssets)
+          .where(eq(schema.liquidAssets.id, id))
+          .run();
+
+        loadAccounts();
+        return { archived: false };
+      }
 
       const txRow = expoDb.getFirstSync<{ count: number }>(
         `SELECT COUNT(*) as count FROM transactions WHERE from_asset_id = ? OR to_asset_id = ?;`,

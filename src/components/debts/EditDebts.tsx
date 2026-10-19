@@ -66,6 +66,15 @@ export function EditDebts({ visible, onClose, debt }: EditDebtsProps) {
       return;
     }
 
+    if (parsedAmount > currentDebt.remainingAmount) {
+      setError(
+        `Amount cannot exceed remaining balance (${currencySymbol}${currentDebt.remainingAmount.toFixed(
+          2
+        )})`
+      );
+      return;
+    }
+
     if (!repayAssetId) {
       setError("Please select an account for this payment");
       return;
@@ -95,40 +104,36 @@ export function EditDebts({ visible, onClose, debt }: EditDebtsProps) {
     const currentDebt = debt;
     const hasHistory = currentDebt.repaymentCount > 0;
 
-    const alertTitle = hasHistory ? "Archive Debt Record" : "Delete Debt Record";
+    const alertTitle = hasHistory ? "Delete Debt & All Payments" : "Delete Debt Record";
     const alertMessage = hasHistory
-      ? `This debt record has ${currentDebt.repaymentCount} linked repayments. It will be safely archived to protect past transaction records.`
-      : "This debt has no recorded repayments and will be permanently deleted.";
+      ? `This debt has ${currentDebt.repaymentCount} recorded repayment(s) totaling ${formatCurrency(
+          currentDebt.repaidAmount,
+          settings?.currency,
+          settings?.numberFormat
+        )}. Deleting this debt will also delete all repayments and restore the funds to their respective accounts.`
+      : "Are you sure you want to permanently delete this debt record? The initial transaction and account balance will be automatically reverted.";
 
     showConfirm({
       title: alertTitle,
       message: alertMessage,
       type: "danger",
-      confirmText: hasHistory ? "Archive" : "Delete",
+      confirmText: hasHistory ? "Delete All" : "Delete",
       isDestructive: true,
       onConfirm: () => {
         requireSecurityAuth({
           ruleKey: "deleteDebt",
-          title: hasHistory ? "Authorize Archive" : "Authorize Deletion",
+          title: "Authorize Deletion",
           description: "Verify your identity to remove this debt record.",
           onSuccess: async () => {
             try {
               setIsDeleting(true);
-              const result = await deleteDebt(currentDebt.id);
+              await deleteDebt(currentDebt.id);
               onClose();
-              if (result.archived) {
-                showAlert({
-                  title: "Debt Archived",
-                  message:
-                    "Record was archived to preserve payment transactions.",
-                  type: "info",
-                });
-              }
-            } catch (err) {
+            } catch (err: any) {
               console.error("Delete debt error:", err);
               showAlert({
                 title: "Error",
-                message: "Could not delete debt record.",
+                message: err?.message || "Could not delete debt record.",
                 type: "danger",
               });
             } finally {
@@ -196,18 +201,26 @@ export function EditDebts({ visible, onClose, debt }: EditDebtsProps) {
               <View className="bg-dark-card border border-dark-border rounded-2xl p-4 mb-5">
                 <View className="flex-row items-center justify-between mb-2">
                   <Text className="text-dark-muted text-xs font-semibold uppercase tracking-wider">
-                    {debt.isSettled ? "Settled Balance" : "Remaining Due"}
+                    {debt.state !== "ONGOING"
+                      ? debt.state === "WRITTEN_OFF"
+                        ? "Written Off"
+                        : "Settled Balance"
+                      : "Remaining Due"}
                   </Text>
                   <Text
                     className={`text-xs font-bold ${
-                      debt.isSettled
+                      debt.state !== "ONGOING"
                         ? "text-brand-accent"
                         : isLend
                         ? "text-brand-lend"
                         : "text-brand-borrow"
                     }`}
                   >
-                    {debt.isSettled ? "SETTLED" : `${debt.progressPercent}% Repaid`}
+                    {debt.state === "WRITTEN_OFF"
+                      ? "WRITTEN OFF"
+                      : debt.state === "REPAID"
+                      ? "SETTLED"
+                      : `${debt.progressPercent}% Repaid`}
                   </Text>
                 </View>
 
@@ -286,7 +299,7 @@ export function EditDebts({ visible, onClose, debt }: EditDebtsProps) {
               ) : null}
 
               {/* Repayment Form or Trigger */}
-              {!debt.isSettled && (
+              {debt.state === "ONGOING" && (
                 <View className="mt-4">
                   {!showRepayForm ? (
                     <TouchableOpacity
@@ -408,13 +421,13 @@ export function EditDebts({ visible, onClose, debt }: EditDebtsProps) {
                 activeOpacity={0.8}
               >
                 <Text className="text-dark-text font-bold text-xs">
-                  {debt.isSettledManually
-                    ? "Unmark Manual Settlement"
+                  {debt.state === "WRITTEN_OFF"
+                    ? "Reopen Debt"
                     : "Mark as Settled Manually"}
                 </Text>
               </TouchableOpacity>
 
-              {/* Delete / Archive Button */}
+              {/* Delete Button */}
               <TouchableOpacity
                 onPress={handleDelete}
                 disabled={isSubmitting || isDeleting}
@@ -427,7 +440,7 @@ export function EditDebts({ visible, onClose, debt }: EditDebtsProps) {
                   <>
                     <Ionicons name="trash-outline" size={18} color="#F43F5E" />
                     <Text className="text-rose-500 font-bold text-sm">
-                      {debt.repaymentCount > 0 ? "Archive Debt" : "Delete Debt"}
+                      Delete Debt
                     </Text>
                   </>
                 )}

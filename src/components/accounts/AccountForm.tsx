@@ -18,7 +18,13 @@ import { useAuth } from "../../context/auth";
 import { useSecurityGuard } from "../../context/security";
 import { LiquidAssetType } from "../../db/schema";
 import { formatCurrency, getCurrencySymbol } from "../../services/currency";
+import { Dropdown, DropdownOption } from "../Dropdown";
 import { ScreenHeader } from "../ScreenHeader";
+
+const ACCOUNT_TYPE_OPTIONS: DropdownOption<LiquidAssetType>[] = [
+  { value: "BANK", label: "Bank Account", icon: "business-outline" },
+  { value: "CASH", label: "Cash Wallet", icon: "wallet-outline" },
+];
 
 export interface AccountFormProps {
   mode: "create" | "edit";
@@ -107,9 +113,11 @@ export function AccountForm({
               note: note.trim() || null,
             });
           } else if (mode === "edit" && account) {
-            // Once created, name and note can be edited (initial amount and type remain immutable)
+            // Once created, name, account number, and note can be edited (initial amount and type remain immutable)
             await updateAccount(account.id, {
               name: trimmedName,
+              accountNumber:
+                assetType === "BANK" ? accountNumber.trim() || null : null,
               note: note.trim() || null,
             });
           }
@@ -224,49 +232,13 @@ export function AccountForm({
           <View className="gap-5 mb-8">
             {mode === "create" ? (
               <>
-                {/* Account Type Selector (matches transaction creation type style) */}
-                <View>
-                  <Text className="text-dark-text text-sm font-semibold mb-2">
-                    Account Type
-                  </Text>
-                  <View className="bg-dark-surface p-1 rounded-2xl flex-row items-center border border-dark-border">
-                    {(["BANK", "CASH"] as const).map((t) => {
-                      const isActive = assetType === t;
-                      const label =
-                        t === "BANK" ? "Bank Account" : "Cash Wallet";
-                      const iconName =
-                        t === "BANK" ? "business" : "wallet-outline";
-
-                      return (
-                        <TouchableOpacity
-                          key={t}
-                          onPress={() => setAssetType(t)}
-                          activeOpacity={0.8}
-                          className={`flex-1 py-2.5 rounded-2xl flex-row items-center justify-center gap-2 ${
-                            isActive
-                              ? "bg-dark-card border border-dark-border/80"
-                              : "bg-transparent"
-                          }`}
-                        >
-                          <Ionicons
-                            name={iconName}
-                            size={16}
-                            color={isActive ? "#D4F938" : "#94A3B8"}
-                          />
-                          <Text
-                            className={`text-sm ${
-                              isActive
-                                ? "text-dark-text font-bold"
-                                : "text-dark-muted font-medium"
-                            }`}
-                          >
-                            {label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
+                {/* Account Type Dropdown */}
+                <Dropdown<LiquidAssetType>
+                  label="Account Type"
+                  selectedValue={assetType}
+                  onSelect={(val) => setAssetType(val)}
+                  options={ACCOUNT_TYPE_OPTIONS}
+                />
 
                 {/* Account Name */}
                 <View>
@@ -385,6 +357,52 @@ export function AccountForm({
                   </View>
                 </View>
 
+                {/* Account Name (Editable in Edit mode) */}
+                <View>
+                  <Text className="text-dark-text text-sm font-semibold mb-2">
+                    Account Name
+                  </Text>
+                  <View className="bg-dark-surface border border-dark-border rounded-2xl px-4 py-3.5">
+                    <TextInput
+                      placeholder={
+                        assetType === "BANK"
+                          ? "e.g. Chase Checking, Wells Fargo"
+                          : "e.g. Physical Wallet, Pocket Cash"
+                      }
+                      placeholderTextColor="#60677C"
+                      value={name}
+                      onChangeText={(val) => {
+                        setName(val);
+                        if (error) setError(null);
+                      }}
+                      className="text-dark-text text-sm py-0"
+                      autoCapitalize="words"
+                    />
+                  </View>
+                </View>
+
+                {/* Optional Account Number for Bank (Editable in Edit mode) */}
+                {assetType === "BANK" && (
+                  <View>
+                    <View className="flex-row items-center justify-between mb-2">
+                      <Text className="text-dark-text text-sm font-semibold">
+                        Account Number
+                      </Text>
+                      <Text className="text-dark-muted text-xs">Optional</Text>
+                    </View>
+                    <View className="bg-dark-surface border border-dark-border rounded-2xl px-4 py-3.5">
+                      <TextInput
+                        placeholder="e.g. •••• 4821 or Account #"
+                        placeholderTextColor="#60677C"
+                        value={accountNumber}
+                        onChangeText={setAccountNumber}
+                        keyboardType="numeric"
+                        className="text-dark-text text-sm py-0"
+                      />
+                    </View>
+                  </View>
+                )}
+
                 {/* Locked Initial Amount (Edit mode) */}
                 <View>
                   <Text className="text-dark-text text-sm font-semibold mb-2">
@@ -426,12 +444,14 @@ export function AccountForm({
               </>
             )}
           </View>
+        </ScrollView>
 
-          {/* Submit Action Button */}
+        {/* Action Button at Bottom */}
+        <View className="px-6 pb-6 pt-3 bg-dark-bg/95 border-t border-dark-border/40">
           <TouchableOpacity
             onPress={handleSave}
             disabled={!canSubmit || isSubmitting}
-            className={`w-full py-4 rounded-full items-center justify-center shadow-lg active:opacity-90 ${
+            className={`w-full py-4 rounded-2xl items-center justify-center shadow-lg active:opacity-90 ${
               canSubmit && !isSubmitting
                 ? "bg-brand-accent"
                 : "bg-dark-surface border border-dark-border opacity-50"
@@ -442,15 +462,15 @@ export function AccountForm({
               <ActivityIndicator color="#0B0D12" size="small" />
             ) : (
               <Text
-                className={`font-bold text-base ${
-                  canSubmit ? "text-brand-accentDark" : "text-dark-muted"
+                className={`font-bold text-base font-sans ${
+                  canSubmit ? "text-dark-bg" : "text-dark-muted"
                 }`}
               >
                 {mode === "create" ? "Create Account" : "Save Changes"}
               </Text>
             )}
           </TouchableOpacity>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

@@ -48,11 +48,21 @@ export function ensureDatabaseInitialized() {
         type TEXT NOT NULL,
         amount REAL NOT NULL,
         due_date TEXT,
-        is_settled INTEGER DEFAULT 0 NOT NULL,
-        is_settled_manually INTEGER DEFAULT 0 NOT NULL,
+        state TEXT DEFAULT 'ONGOING' NOT NULL,
+        settled_at TEXT,
+        settled_note TEXT,
         note TEXT,
         created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
         updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS debt_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        debt_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        old_amount REAL,
+        new_amount REAL,
+        note TEXT,
+        created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
       );
       CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -142,9 +152,40 @@ export function ensureDatabaseInitialized() {
       );
     } catch {}
     try {
+      expoDb.execSync("ALTER TABLE debts ADD COLUMN settled_at TEXT;");
+    } catch {}
+    try {
+      expoDb.execSync("ALTER TABLE debts ADD COLUMN settled_note TEXT;");
+    } catch {}
+    try {
       expoDb.execSync(
-        "ALTER TABLE debts ADD COLUMN is_archived INTEGER DEFAULT 0 NOT NULL;"
+        "ALTER TABLE debts ADD COLUMN state TEXT DEFAULT 'ONGOING' NOT NULL;"
       );
+    } catch {}
+    try {
+      expoDb.execSync(`
+        UPDATE debts 
+        SET state = 'WRITTEN_OFF' 
+        WHERE (state = 'ONGOING' OR state IS NULL) AND is_settled_manually = 1;
+      `);
+      expoDb.execSync(`
+        UPDATE debts 
+        SET state = 'REPAID' 
+        WHERE (state = 'ONGOING' OR state IS NULL) AND is_settled = 1 AND (is_settled_manually = 0 OR is_settled_manually IS NULL);
+      `);
+    } catch {}
+    try {
+      expoDb.execSync(`
+        CREATE TABLE IF NOT EXISTS debt_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          debt_id INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          old_amount REAL,
+          new_amount REAL,
+          note TEXT,
+          created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+        );
+      `);
     } catch {}
     try {
       expoDb.execSync("ALTER TABLE contacts ADD COLUMN avatar_svg TEXT;");

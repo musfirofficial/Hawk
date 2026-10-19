@@ -51,5 +51,8 @@ export function useSafeRouter() {
     push: safePush,
     replace: safeReplace,
     back: safeBack,
+    safePush,
+    safeReplace,
+    safeBack,
   };
 }

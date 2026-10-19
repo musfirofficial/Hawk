@@ -31,6 +31,9 @@ export type CategoryType = (typeof CATEGORY_TYPES)[number];
 export const DEBT_TYPES = ["LEND", "BORROW"] as const;
 export type DebtType = (typeof DEBT_TYPES)[number];
 
+export const DEBT_STATES = ["ONGOING", "REPAID", "WRITTEN_OFF"] as const;
+export type DebtState = (typeof DEBT_STATES)[number];
+
 export const SUPPORTED_CURRENCIES = [
   // --- Original Currencies ---
   { code: "USD", symbol: "\u0024", name: "US Dollar" }, // $
@@ -143,15 +146,11 @@ export const debts = sqliteTable("debts", {
   type: text("type", { enum: DEBT_TYPES }).notNull(), // 'LEND' | 'BORROW'
   amount: real("amount").notNull(), // Total initial amount of the debt
   dueDate: text("due_date"), // Optional deadline for repayment
-  isSettled: integer("is_settled", { mode: "boolean" })
-    .default(false)
-    .notNull(), // Automatically true when fully paid
-  isSettledManually: integer("is_settled_manually", { mode: "boolean" })
-    .default(false)
-    .notNull(), // Manual settlement / forgiveness
-  isArchived: integer("is_archived", { mode: "boolean" })
-    .default(false)
+  state: text("state", { enum: DEBT_STATES })
+    .default("ONGOING")
     .notNull(),
+  settledAt: text("settled_at"),
+  settledNote: text("settled_note"),
   note: text("note"),
   createdAt: text("created_at")
     .default(sql`(CURRENT_TIMESTAMP)`)
@@ -160,6 +159,26 @@ export const debts = sqliteTable("debts", {
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),
 });
+
+export const DEBT_LOG_TYPES = ["AMOUNT_CHANGED", "SETTLED_MANUALLY"] as const;
+export type DebtLogType = (typeof DEBT_LOG_TYPES)[number];
+
+export const debtLogs = sqliteTable("debt_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  debtId: integer("debt_id")
+    .references(() => debts.id, { onDelete: "cascade" })
+    .notNull(),
+  type: text("type", { enum: DEBT_LOG_TYPES }).notNull(),
+  oldAmount: real("old_amount"),
+  newAmount: real("new_amount"),
+  note: text("note"),
+  createdAt: text("created_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
+});
+
+export type DebtLog = typeof debtLogs.$inferSelect;
+export type NewDebtLog = typeof debtLogs.$inferInsert;
 
 // ==========================================
 // 5. Transactions Table (All 7 types + Repayments)

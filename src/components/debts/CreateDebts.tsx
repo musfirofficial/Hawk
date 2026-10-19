@@ -76,6 +76,15 @@ export function CreateDebts({
       return;
     }
 
+    if (!assetId) {
+      setError(
+        type === "LEND"
+          ? "Please select a payment account"
+          : "Please select a deposit account"
+      );
+      return;
+    }
+
     setError(null);
 
     try {
@@ -84,7 +93,7 @@ export function CreateDebts({
         contactId,
         type,
         amount: parsedAmount,
-        assetId: assetId || null,
+        assetId: assetId,
         dueDate: dueDate.trim() || null,
         note: note.trim() || null,
       });

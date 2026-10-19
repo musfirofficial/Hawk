@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../../context/auth";
 import { TransactionItem } from "../../context/transactions";
@@ -9,11 +9,15 @@ import { getTodayYMD } from "../calendar";
 interface TransactionCardProps {
   transaction: TransactionItem;
   onPress?: () => void;
+  className?: string;
+  isLate?: boolean;
 }
 
 export function TransactionCard({
   transaction,
   onPress,
+  className = "",
+  isLate = false,
 }: TransactionCardProps) {
   const { settings } = useAuth();
 
@@ -82,9 +86,7 @@ export function TransactionCard({
       const contact = transaction.contactName || "Contact";
       raw = `Received from ${contact}`;
     } else {
-      raw =
-        transaction.categoryName ||
-        (isIncome ? "Income" : "Expense");
+      raw = transaction.categoryName || (isIncome ? "Income" : "Expense");
     }
 
     if (raw.length > 28) {
@@ -115,16 +117,10 @@ export function TransactionCard({
       raw = transaction.fromAssetName || "Account";
     } else if (isBorrow) {
       // Where it is stored
-      raw =
-        transaction.toAssetName ||
-        transaction.fromAssetName ||
-        "Account";
+      raw = transaction.toAssetName || transaction.fromAssetName || "Account";
     } else {
       // Normal transaction account name
-      raw =
-        transaction.fromAssetName ||
-        transaction.toAssetName ||
-        "Account";
+      raw = transaction.fromAssetName || transaction.toAssetName || "Account";
     }
 
     if (raw.length > 30) {
@@ -160,7 +156,7 @@ export function TransactionCard({
             const d = new Date(
               parseInt(parts[0], 10),
               parseInt(parts[1], 10) - 1,
-              parseInt(parts[2], 10)
+              parseInt(parts[2], 10),
             );
             datePart = d.toLocaleDateString("en-US", {
               day: "numeric",
@@ -181,7 +177,7 @@ export function TransactionCard({
         const d = new Date(
           transaction.createdAt.includes("T")
             ? transaction.createdAt
-            : transaction.createdAt.replace(" ", "T") + "Z"
+            : transaction.createdAt.replace(" ", "T") + "Z",
         );
         if (!isNaN(d.getTime())) {
           const hours = d.getHours().toString().padStart(2, "0");
@@ -202,7 +198,9 @@ export function TransactionCard({
       onPress={onPress}
       disabled={!onPress}
       activeOpacity={0.7}
-      className="bg-dark-surface p-4 rounded-2xl border border-dark-border flex-row items-center justify-between"
+      className={`bg-dark-surface p-4 rounded-2xl flex-row items-center justify-between border ${
+        isLate ? "border-rose-500/80 bg-rose-500/5" : "border-dark-border"
+      } ${className}`}
     >
       {/* Left: Circular Icon Badge */}
       <View className="flex-row items-center gap-3.5 flex-1 mr-3">
@@ -239,13 +237,24 @@ export function TransactionCard({
           {formatCurrency(
             transaction.amount,
             settings?.currency,
-            settings?.numberFormat
+            settings?.numberFormat,
           )}
         </Text>
         {displayDateTime ? (
-          <Text className="text-dark-muted font-medium text-xs mt-1">
-            {displayDateTime}
-          </Text>
+          <View className="flex-row items-center gap-1 mt-1">
+            {isLate ? (
+              <Text className="text-rose-400 font-bold text-[10px]  tracking-wider">
+                Late ·
+              </Text>
+            ) : null}
+            <Text
+              className={`font-medium text-xs ${
+                isLate ? "text-rose-400/80" : "text-dark-muted"
+              }`}
+            >
+              {displayDateTime}
+            </Text>
+          </View>
         ) : null}
       </View>
     </TouchableOpacity>

@@ -473,7 +473,15 @@ export default function FullTransactionScreen() {
                     <TransactionCard
                       key={tx.id}
                       transaction={tx}
-                      onPress={() => router.push(`/(transaction)/${tx.id}` as any)}
+                      onPress={() => {
+                        if (tx.debtId) {
+                          router.push(
+                            `/createdebt?debtId=${tx.debtId}&txId=${tx.id}&mode=preview&from=transactions` as any
+                          );
+                        } else {
+                          router.push(`/(transaction)/${tx.id}` as any);
+                        }
+                      }}
                     />
                   ))}
                 </View>

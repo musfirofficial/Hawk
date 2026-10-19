@@ -23,10 +23,16 @@ export function DebtCard({ debt, onPress }: DebtCardProps) {
 
   // Calculate dynamic due date status (returns null if no due date)
   const dueStatus = useMemo(() => {
-    if (debt.isSettled) {
+    if (debt.state === "REPAID") {
       return {
-        text: "Settled",
+        text: "Repaid",
         colorClass: "text-emerald-400 font-semibold",
+      };
+    }
+    if (debt.state === "WRITTEN_OFF") {
+      return {
+        text: "Written Off",
+        colorClass: "text-amber-400 font-semibold",
       };
     }
 
@@ -72,7 +78,7 @@ export function DebtCard({ debt, onPress }: DebtCardProps) {
       text: `${days} ${days === 1 ? "day" : "days"} left`,
       colorClass: "text-dark-muted font-medium",
     };
-  }, [debt.dueDate, debt.isSettled]);
+  }, [debt.dueDate, debt.state]);
 
   return (
     <TouchableOpacity
@@ -117,8 +123,10 @@ export function DebtCard({ debt, onPress }: DebtCardProps) {
         <View className="flex-row items-center justify-between mb-1.5">
           {/* Replaced % repaid with amount remaining */}
           <Text className="text-dark-muted font-medium text-xs">
-            {debt.isSettled
-              ? "Settled"
+            {debt.state === "REPAID"
+              ? "Repaid"
+              : debt.state === "WRITTEN_OFF"
+              ? "Written Off"
               : `${formatCurrency(
                   debt.remainingAmount,
                   settings?.currency,
