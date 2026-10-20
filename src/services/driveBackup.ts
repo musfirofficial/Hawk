@@ -230,15 +230,19 @@ export async function performRestoreFromDrive(
           AND name NOT LIKE '__drizzle_%';
       `);
 
-      for (const tbl of tables) {
-        try {
+      expoDb.execSync("BEGIN IMMEDIATE TRANSACTION;");
+      try {
+        for (const tbl of tables) {
+          const safeName = `"${tbl.name.replace(/"/g, '""')}"`;
           expoDb.execSync(`
-            DELETE FROM main.${tbl.name};
-            INSERT INTO main.${tbl.name} SELECT * FROM backup_db.${tbl.name};
+            DELETE FROM main.${safeName};
+            INSERT INTO main.${safeName} SELECT * FROM backup_db.${safeName};
           `);
-        } catch (tableErr) {
-          console.warn(`Error restoring table ${tbl.name}:`, tableErr);
         }
+        expoDb.execSync("COMMIT;");
+      } catch (txErr) {
+        expoDb.execSync("ROLLBACK;");
+        throw txErr;
       }
     } finally {
       try {

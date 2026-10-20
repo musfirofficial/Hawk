@@ -20,6 +20,7 @@ export default function VerifyCodeScreen() {
   const router = useSafeRouter();
   const {
     settings,
+    verifyRecoveryKey,
     setRecoverySessionVerified,
     recordFailedRecoveryAttempt,
     resetRecoveryAttempts,
@@ -110,11 +111,9 @@ export default function VerifyCodeScreen() {
     }
 
     setIsVerifying(true);
-    const cleanedStored = (settings?.recoveryKey || "")
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "");
+    const isValid = await verifyRecoveryKey(cleanedInput);
 
-    if (cleanedStored && cleanedInput === cleanedStored) {
+    if (isValid) {
       await resetRecoveryAttempts();
       setRecoverySessionVerified(true);
       setIsVerifying(false);

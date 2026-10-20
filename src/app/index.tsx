@@ -11,7 +11,7 @@ import {
 } from "../services/biometrics";
 
 export default function Index() {
-  const { hasOnboarded, isLoading, settings, unlockApp } = useAuth();
+  const { hasOnboarded, isLoading, settings, unlockApp, hasPin } = useAuth();
   const router = useRouter();
 
   const [bioCapability, setBioCapability] = useState<BiometricCapability>({
@@ -24,7 +24,7 @@ export default function Index() {
     hasOnboarded &&
     settings?.appLockEnabled &&
     settings?.pinEnabled &&
-    settings?.pin,
+    hasPin,
   );
 
   useEffect(() => {

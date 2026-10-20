@@ -87,12 +87,12 @@ export function ContactsProvider({ children }: { children: React.ReactNode }) {
           COALESCE((
             SELECT SUM(d.amount - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.debt_id = d.id), 0))
             FROM debts d
-            WHERE d.contact_id = c.id AND d.type = 'LEND' AND d.is_settled = 0 AND d.is_settled_manually = 0
+            WHERE d.contact_id = c.id AND d.type = 'LEND' AND d.state = 'ONGOING'
           ), 0) AS total_owed_to_me,
           COALESCE((
             SELECT SUM(d.amount - COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.debt_id = d.id), 0))
             FROM debts d
-            WHERE d.contact_id = c.id AND d.type = 'BORROW' AND d.is_settled = 0 AND d.is_settled_manually = 0
+            WHERE d.contact_id = c.id AND d.type = 'BORROW' AND d.state = 'ONGOING'
           ), 0) AS total_i_owe,
           COALESCE((
             SELECT COUNT(*) FROM transactions WHERE contact_id = c.id

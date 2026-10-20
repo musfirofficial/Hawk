@@ -28,6 +28,7 @@ export default function SettingsScreen() {
   const { showAlert, showConfirm } = useAlert();
   const {
     settings,
+    hasPin,
     signInWithGoogle,
     disconnectGoogle,
     reloadSettings,
@@ -43,7 +44,6 @@ export default function SettingsScreen() {
     label: "Biometrics",
   });
 
-  const hasPin = Boolean(settings?.pin);
   const isPinEnabled = Boolean(settings?.pinEnabled);
   const isGoogleConnected = Boolean(settings?.googleEmail);
 

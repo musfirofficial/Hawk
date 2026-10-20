@@ -65,7 +65,7 @@ TextInput.defaultProps.style = [
 ];
 
 function NavigationGate() {
-  const { hasOnboarded, isLoading, settings, isAppUnlocked } = useAuth();
+  const { hasOnboarded, isLoading, settings, isAppUnlocked, hasPin } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -118,7 +118,6 @@ function NavigationGate() {
 
     const appLockEnabled = Boolean(settings?.appLockEnabled);
     const pinEnabled = Boolean(settings?.pinEnabled);
-    const hasPin = Boolean(settings?.pin);
 
     const shouldLock = Boolean(
       hasOnboarded && appLockEnabled && pinEnabled && hasPin
@@ -139,7 +138,7 @@ function NavigationGate() {
     isLoading,
     Boolean(settings?.appLockEnabled),
     Boolean(settings?.pinEnabled),
-    Boolean(settings?.pin),
+    hasPin,
     isAppUnlocked,
     segments,
     router,

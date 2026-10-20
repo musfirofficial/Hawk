@@ -81,11 +81,17 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
   ) {
     const {
       settings,
+      hasPin,
+      verifyPin,
+      verifyRecoveryKey,
       getPinLockoutSeconds,
       recordFailedPinAttempt,
       resetPinAttempts,
+      getRecoveryLockoutSeconds,
+      recordFailedRecoveryAttempt,
+      resetRecoveryAttempts,
     } = useAuth();
-    const hasExistingPin = Boolean(isChangePin && settings?.pin);
+    const hasExistingPin = Boolean(isChangePin && (hasPin ?? Boolean(settings?.pin)));
 
     const [step, setStep] = useState<PinStep>(
       mode === "verify" ? "VERIFY" : hasExistingPin ? "CURRENT" : "CREATE",
@@ -97,6 +103,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
     const [saving, setSaving] = useState(false);
     const [isResetMode, setIsResetMode] = useState(false);
     const [pinLockoutSeconds, setPinLockoutSeconds] = useState(0);
+    const [recoveryLockoutSeconds, setRecoveryLockoutSeconds] = useState(0);
 
     // Check initial PIN lockout state
     useEffect(() => {
@@ -105,6 +112,14 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
         setPinLockoutSeconds(remaining);
       }
     }, [getPinLockoutSeconds]);
+
+    // Check initial Recovery lockout state
+    useEffect(() => {
+      const remaining = getRecoveryLockoutSeconds();
+      if (remaining > 0) {
+        setRecoveryLockoutSeconds(remaining);
+      }
+    }, [getRecoveryLockoutSeconds, isResetModalVisible]);
 
     // PIN lockout countdown timer
     useEffect(() => {
@@ -120,6 +135,21 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
       }, 1000);
       return () => clearInterval(interval);
     }, [pinLockoutSeconds]);
+
+    // Recovery lockout countdown timer
+    useEffect(() => {
+      if (recoveryLockoutSeconds <= 0) return;
+      const interval = setInterval(() => {
+        setRecoveryLockoutSeconds((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }, [recoveryLockoutSeconds]);
 
     // Reset PIN Modal state
     const [isResetModalVisible, setIsResetModalVisible] = useState(false);
@@ -150,19 +180,18 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
       setResetError(null);
     }
 
-    function handleVerifyResetCode() {
-      if (isResetSuccess) return;
+    async function handleVerifyResetCode() {
+      if (isResetSuccess || recoveryLockoutSeconds > 0) return;
       const cleanedInput = resetCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      const cleanedStored = (settings?.recoveryKey || "")
-        .toUpperCase()
-        .replace(/[^A-Z0-9]/g, "");
 
       if (cleanedInput.length < 8) {
         setResetError("Please enter the complete 8-character code.");
         return;
       }
 
-      if (cleanedStored && cleanedInput === cleanedStored) {
+      const isValid = await verifyRecoveryKey(cleanedInput);
+      if (isValid) {
+        await resetRecoveryAttempts();
         setIsResetSuccess(true);
         setResetError(null);
 
@@ -180,7 +209,13 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
         if (Platform.OS !== "web") {
           Vibration.vibrate(150);
         }
-        setResetError("Incorrect recovery code. Please try again.");
+        const res = await recordFailedRecoveryAttempt();
+        if (res.lockedOut) {
+          setRecoveryLockoutSeconds(res.remainingSeconds);
+          setResetError(`Too many attempts. Try again in ${res.remainingSeconds}s`);
+        } else {
+          setResetError("Incorrect recovery code. Please try again.");
+        }
       }
     }
 
@@ -238,7 +273,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
               if (onVerify) {
                 isValid = await onVerify(next);
               } else {
-                isValid = Boolean(settings?.pin && next === settings.pin);
+                isValid = await verifyPin(next);
               }
 
               if (isValid) {
@@ -270,7 +305,8 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
           })();
         } else if (step === "CURRENT") {
           (async () => {
-            if (settings?.pin && next === settings.pin) {
+            const isCurrentValid = await verifyPin(next);
+            if (isCurrentValid) {
               await resetPinAttempts();
               setIsSubmitting(true);
               setTimeout(() => {
@@ -636,9 +672,13 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
               ) : (
                 <TouchableOpacity
                   onPress={handleVerifyResetCode}
-                  disabled={resetCode.replace(/[^A-Z0-9]/g, "").length < 8}
+                  disabled={
+                    resetCode.replace(/[^A-Z0-9]/g, "").length < 8 ||
+                    recoveryLockoutSeconds > 0
+                  }
                   className={`w-full py-4 rounded-full items-center justify-center mb-2 shadow-lg ${
-                    resetCode.replace(/[^A-Z0-9]/g, "").length === 8
+                    resetCode.replace(/[^A-Z0-9]/g, "").length === 8 &&
+                    recoveryLockoutSeconds <= 0
                       ? "bg-brand-accent active:opacity-90"
                       : "bg-dark-border/40 opacity-50"
                   }`}
@@ -646,12 +686,15 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
                 >
                   <Text
                     className={`font-bold text-base ${
-                      resetCode.replace(/[^A-Z0-9]/g, "").length === 8
+                      resetCode.replace(/[^A-Z0-9]/g, "").length === 8 &&
+                      recoveryLockoutSeconds <= 0
                         ? "text-dark-bg"
                         : "text-dark-muted"
                     }`}
                   >
-                    Verify Code
+                    {recoveryLockoutSeconds > 0
+                      ? `Locked Out (${recoveryLockoutSeconds}s)`
+                      : "Verify Code"}
                   </Text>
                 </TouchableOpacity>
               )}

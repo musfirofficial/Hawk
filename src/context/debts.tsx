@@ -391,19 +391,19 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
     async (id: number): Promise<void> => {
       ensureDatabaseInitialized();
 
-      // Delete all linked transactions (initial loan and any repayments)
+      // Delete all linked transactions, debt logs, and the debt record atomically
       // Dynamic SQL aggregation automatically reverts balances across all involved accounts!
-      db.delete(schema.transactions)
-        .where(eq(schema.transactions.debtId, id))
-        .run();
+      expoDb.withTransactionSync(() => {
+        db.delete(schema.transactions)
+          .where(eq(schema.transactions.debtId, id))
+          .run();
 
-      // Delete debt logs
-      db.delete(schema.debtLogs)
-        .where(eq(schema.debtLogs.debtId, id))
-        .run();
+        db.delete(schema.debtLogs)
+          .where(eq(schema.debtLogs.debtId, id))
+          .run();
 
-      // Delete the debt record
-      db.delete(schema.debts).where(eq(schema.debts.id, id)).run();
+        db.delete(schema.debts).where(eq(schema.debts.id, id)).run();
+      });
 
       loadDebts();
     },
@@ -601,29 +601,33 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
   const deleteDebtPayment = useCallback(
     async (txId: number, debtId: number) => {
       ensureDatabaseInitialized();
-      db.delete(schema.transactions).where(eq(schema.transactions.id, txId)).run();
+      expoDb.withTransactionSync(() => {
+        db.delete(schema.transactions).where(eq(schema.transactions.id, txId)).run();
 
-      // Check remaining after deletion
-      const sumRow = expoDb.getFirstSync<{ repaid: number }>(
-        `SELECT SUM(amount) as repaid FROM transactions WHERE debt_id = ? AND (type = 'DEBT PAID' OR type = 'DEBT RECEIVED');`,
-        [debtId]
-      );
-      const repaid = Number(sumRow?.repaid) || 0;
-      const debtRow = expoDb.getFirstSync<{ amount: number; state: string }>(
-        `SELECT amount, state FROM debts WHERE id = ?;`,
-        [debtId]
-      );
-      if (debtRow && debtRow.state !== "WRITTEN_OFF") {
-        const stillSettled = repaid >= debtRow.amount;
-        db.update(schema.debts)
-          .set({
-            state: stillSettled ? "REPAID" : "ONGOING",
-            settledAt: stillSettled ? undefined : null,
-            updatedAt: new Date().toISOString(),
-          })
-          .where(eq(schema.debts.id, debtId))
-          .run();
-      }
+        // Check remaining after deletion
+        const sumRow = expoDb.getFirstSync<{ repaid: number }>(
+          `SELECT SUM(amount) as repaid FROM transactions WHERE debt_id = ? AND (type = 'DEBT PAID' OR type = 'DEBT RECEIVED');`,
+          [debtId]
+        );
+        const repaid = Number(sumRow?.repaid) || 0;
+        const debtRow = expoDb.getFirstSync<{ amount: number; state: string }>(
+          `SELECT amount, state FROM debts WHERE id = ?;`,
+          [debtId]
+        );
+        if (debtRow && debtRow.state !== "WRITTEN_OFF") {
+          const stillSettled = repaid >= debtRow.amount;
+          const now = new Date().toISOString();
+          db.update(schema.debts)
+            .set({
+              state: stillSettled ? "REPAID" : "ONGOING",
+              settledAt: stillSettled ? now : null,
+              settledNote: stillSettled ? undefined : null,
+              updatedAt: now,
+            })
+            .where(eq(schema.debts.id, debtId))
+            .run();
+        }
+      });
       loadDebts();
     },
     [loadDebts]

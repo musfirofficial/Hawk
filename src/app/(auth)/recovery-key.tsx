@@ -20,15 +20,25 @@ import {
 
 export default function RecoveryKeyScreen() {
   const router = useRouter();
-  const { settings, updateSecuritySettings } = useAuth();
+  const { settings, updateSecuritySettings, getRecoveryKey } = useAuth();
   const params = useLocalSearchParams<{
     recoveryKey?: string;
     origin?: "onboard" | "startup" | "settings";
   }>();
   const origin = params.origin || "onboard";
 
+  const [secureKey, setSecureKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!params.recoveryKey) {
+      getRecoveryKey().then((k) => {
+        if (k) setSecureKey(k);
+      });
+    }
+  }, [params.recoveryKey, getRecoveryKey]);
+
   const recoveryCode =
-    params.recoveryKey || settings?.recoveryKey || "HWK-RECOVERY";
+    params.recoveryKey || secureKey || settings?.recoveryKey || "HWK-RECOVERY";
 
   const [copied, setCopied] = useState(false);
   const [bioCapability, setBioCapability] = useState<BiometricCapability>({

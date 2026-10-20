@@ -31,7 +31,7 @@ export function SecurityGuardModal({
   onSuccess,
   onCancel,
 }: SecurityGuardModalProps) {
-  const { settings } = useAuth();
+  const { settings, verifyPin, hasPin } = useAuth();
   const [viewMode, setViewMode] = useState<"BIOMETRIC" | "PIN">("PIN");
   const [enteredPin, setEnteredPin] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -123,22 +123,30 @@ export function SecurityGuardModal({
     setErrorMsg(null);
 
     if (cleaned.length === 4) {
-      const savedPin = settings?.pin;
-
-      // If no PIN set in DB, allow access
-      if (!savedPin || cleaned === savedPin) {
-        setTimeout(() => {
-          onSuccess();
-        }, 100);
-      } else {
-        if (Platform.OS !== "web") {
-          Vibration.vibrate(100);
+      (async () => {
+        // If no PIN set, allow access
+        if (!hasPin) {
+          setTimeout(() => {
+            onSuccess();
+          }, 100);
+          return;
         }
-        setErrorMsg("Incorrect PIN. Please try again.");
-        setTimeout(() => {
-          setEnteredPin("");
-        }, 350);
-      }
+
+        const isValid = await verifyPin(cleaned);
+        if (isValid) {
+          setTimeout(() => {
+            onSuccess();
+          }, 100);
+        } else {
+          if (Platform.OS !== "web") {
+            Vibration.vibrate(100);
+          }
+          setErrorMsg("Incorrect PIN. Please try again.");
+          setTimeout(() => {
+            setEnteredPin("");
+          }, 350);
+        }
+      })();
     }
   }
 
