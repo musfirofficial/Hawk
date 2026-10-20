@@ -11,11 +11,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../context/auth";
 
+import { useAlert } from "../../context/alert";
+import {
+  fetchCloudBackupMetadata,
+  performRestoreFromDrive,
+  formatDateTime,
+} from "../../services/driveBackup";
+import { getGoogleAccessToken } from "../../services/googleAuth";
 import { useSafeRouter } from "../../hooks/useSafeRouter";
 
 export default function LoginScreen() {
   const router = useSafeRouter();
-  const { signInWithGoogle, isGoogleAuthEnabled } = useAuth();
+  const { showConfirm } = useAlert();
+  const { signInWithGoogle, isGoogleAuthEnabled, reloadSettings } = useAuth();
   const [signingIn, setSigningIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -32,6 +40,42 @@ export default function LoginScreen() {
       setErrorMsg(null);
       const res = await signInWithGoogle();
       if (res) {
+        // Check if there is an existing backup on Google Drive
+        try {
+          const token = await getGoogleAccessToken();
+          if (token) {
+            const meta = await fetchCloudBackupMetadata(token);
+            if (meta) {
+              setSigningIn(false);
+              showConfirm({
+                title: "Cloud Backup Found",
+                message: `We found an existing Hawk backup from ${formatDateTime(meta.modifiedTime)}. Would you like to restore your data now?`,
+                confirmText: "Restore Data",
+                cancelText: "Start Fresh",
+                onConfirm: async () => {
+                  try {
+                    setSigningIn(true);
+                    await performRestoreFromDrive(token, meta.id);
+                    reloadSettings();
+                    router.safePush("/(auth)/onboarding" as any);
+                  } catch (e: any) {
+                    setErrorMsg("Restore failed: " + (e?.message || "Unknown error"));
+                    router.safePush("/(auth)/onboarding" as any);
+                  } finally {
+                    setSigningIn(false);
+                  }
+                },
+                onCancel: () => {
+                  router.safePush("/(auth)/onboarding" as any);
+                },
+              });
+              return;
+            }
+          }
+        } catch (backupErr) {
+          console.warn("Could not check for backup:", backupErr);
+        }
+
         router.safePush("/(auth)/onboarding" as any);
       }
     } catch (err: any) {

@@ -113,6 +113,13 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
       }
     }, [getPinLockoutSeconds]);
 
+    // Reset PIN Modal state
+    const [isResetModalVisible, setIsResetModalVisible] = useState(false);
+    const [resetCode, setResetCode] = useState("");
+    const [resetError, setResetError] = useState<string | null>(null);
+    const [isResetSuccess, setIsResetSuccess] = useState(false);
+    const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     // Check initial Recovery lockout state
     useEffect(() => {
       const remaining = getRecoveryLockoutSeconds();
@@ -150,13 +157,6 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
       }, 1000);
       return () => clearInterval(interval);
     }, [recoveryLockoutSeconds]);
-
-    // Reset PIN Modal state
-    const [isResetModalVisible, setIsResetModalVisible] = useState(false);
-    const [resetCode, setResetCode] = useState("");
-    const [resetError, setResetError] = useState<string | null>(null);
-    const [isResetSuccess, setIsResetSuccess] = useState(false);
-    const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
       return () => {

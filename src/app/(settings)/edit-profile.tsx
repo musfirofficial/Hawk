@@ -19,7 +19,6 @@ export default function EditProfileScreen() {
         currency: data.currency,
         numberFormat: data.numberFormat,
         profilePic: data.profilePic,
-        pin: settings?.pin || undefined,
         biometricsEnabled: settings?.biometricsEnabled,
       });
 

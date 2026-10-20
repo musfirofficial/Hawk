@@ -7,7 +7,7 @@ import { useAuth } from "../../context/auth";
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { pendingGoogleUser } = useAuth();
+  const { pendingGoogleUser, settings } = useAuth();
 
   function handleSubmit(data: ProfileFormData) {
     router.push({
@@ -35,7 +35,10 @@ export default function OnboardingScreen() {
       <ProfileForm
         mode="onboarding"
         initialData={{
-          name: pendingGoogleUser?.name || "",
+          name: settings?.userName || pendingGoogleUser?.name || "",
+          currency: settings?.currency || undefined,
+          numberFormat: (settings?.numberFormat as any) || undefined,
+          profilePic: settings?.profilePic,
         }}
         onSubmit={handleSubmit}
       />
