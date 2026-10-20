@@ -11,7 +11,7 @@ import {
 } from "../services/biometrics";
 
 export default function Index() {
-  const { hasOnboarded, isLoading, settings } = useAuth();
+  const { hasOnboarded, isLoading, settings, unlockApp } = useAuth();
   const router = useRouter();
 
   const [bioCapability, setBioCapability] = useState<BiometricCapability>({
@@ -19,7 +19,6 @@ export default function Index() {
     type: null,
     label: "Biometrics",
   });
-  const [hasPromptedBio, setHasPromptedBio] = useState(false);
 
   const shouldLock = Boolean(
     hasOnboarded &&
@@ -42,45 +41,21 @@ export default function Index() {
     if (!hasOnboarded) {
       router.replace("/(auth)/login");
     } else if (!shouldLock) {
+      unlockApp();
       router.replace("/(tabs)");
     }
-  }, [hasOnboarded, isLoading, shouldLock, router]);
-
-  // Attempt biometric prompt on initial display if enabled
-  useEffect(() => {
-    if (!shouldLock || hasPromptedBio || !settings?.biometricsEnabled) return;
-    if (!bioCapability.isAvailable) return;
-
-    let isMounted = true;
-    const timer = setTimeout(async () => {
-      if (!isMounted) return;
-      setHasPromptedBio(true);
-      const res = await authenticateWithBiometrics("Unlock Hawk");
-      if (res.success && isMounted) {
-        router.replace("/(tabs)");
-      }
-    }, 250);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [
-    shouldLock,
-    hasPromptedBio,
-    settings?.biometricsEnabled,
-    bioCapability.isAvailable,
-    router,
-  ]);
+  }, [hasOnboarded, isLoading, shouldLock, unlockApp, router]);
 
   async function handleBiometricPress() {
     const res = await authenticateWithBiometrics("Unlock Hawk");
     if (res.success) {
+      unlockApp();
       router.replace("/(tabs)");
     }
   }
 
   function handlePinSuccess() {
+    unlockApp();
     router.replace("/(tabs)");
   }
 
@@ -104,6 +79,13 @@ export default function Index() {
         )}
         biometricType={bioCapability.type}
         onBiometricPress={handleBiometricPress}
+        showResetPin={true}
+        onResetPinPress={() =>
+          router.push({
+            pathname: "/(auth)/verify-code",
+            params: { origin: "startup" },
+          } as any)
+        }
         onSuccess={handlePinSuccess}
       />
     </SafeAreaView>

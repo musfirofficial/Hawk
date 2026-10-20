@@ -176,115 +176,123 @@ export default function AllDebtsScreen() {
       <HawkFlyUp
         visible={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
-        title="Filter Debts"
-        avoidKeyboard={false}
+        title="Search Filter"
+        maxHeight="85%"
+        style={{ height: "85%" }}
       >
-        <View className="px-1 pb-2">
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: 8, paddingBottom: 24 }}
+          className="flex-1"
+        >
           {/* Section 1: Type */}
-          <Text className="text-dark-text font-bold text-sm mb-2.5">
-            Type
-          </Text>
-          <View className="bg-dark-surface p-1 rounded-2xl flex-row items-center border border-dark-border mb-5">
-            {(
-              [
-                { id: "ALL", label: "All" },
-                { id: "LEND", label: "Lent" },
-                { id: "BORROW", label: "Borrowed" },
-              ] as const
-            ).map((item) => {
-              const isActive = draftFilters.type === item.id;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() =>
-                    setDraftFilters((prev) => ({ ...prev, type: item.id }))
-                  }
-                  activeOpacity={0.8}
-                  className={`flex-1 py-2.5 rounded-2xl items-center justify-center ${
-                    isActive
-                      ? "bg-dark-card border border-dark-border/80"
-                      : "bg-transparent"
-                  }`}
-                >
-                  <Text
-                    className={`text-sm ${
-                      isActive
-                        ? "text-dark-text font-bold"
-                        : "text-dark-muted font-medium"
+          <View className="mb-6">
+            <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-4">
+              Debt Type
+            </Text>
+            <View className="flex-row flex-wrap gap-2.5">
+              {(
+                [
+                  { id: "ALL", label: "All" },
+                  { id: "LEND", label: "Lent" },
+                  { id: "BORROW", label: "Borrowed" },
+                ] as const
+              ).map((item) => {
+                const isSelected = draftFilters.type === item.id;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() =>
+                      setDraftFilters((prev) => ({ ...prev, type: item.id }))
+                    }
+                    activeOpacity={0.7}
+                    className={`px-4 py-2.5 rounded-2xl border ${
+                      isSelected
+                        ? "bg-dark-card border-brand-accent"
+                        : "bg-dark-surface/60 border-dark-border"
                     }`}
                   >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                    <Text
+                      className={`text-xs ${
+                        isSelected
+                          ? "text-brand-accent font-bold"
+                          : "text-dark-muted font-medium"
+                      }`}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
 
           {/* Section 2: State */}
-          <Text className="text-dark-text font-bold text-sm mb-2.5">
-            State
-          </Text>
-          <View className="bg-dark-surface p-1 rounded-2xl flex-row items-center border border-dark-border mb-6">
-            {(
-              [
-                { id: "ALL", label: "All" },
-                { id: "ONGOING", label: "Ongoing" },
-                { id: "REPAID", label: "Repaid" },
-                { id: "WRITTEN_OFF", label: "Written Off" },
-              ] as const
-            ).map((item) => {
-              const isActive = draftFilters.state === item.id;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() =>
-                    setDraftFilters((prev) => ({ ...prev, state: item.id }))
-                  }
-                  activeOpacity={0.8}
-                  className={`flex-1 py-2.5 rounded-2xl items-center justify-center ${
-                    isActive
-                      ? "bg-dark-card border border-dark-border/80"
-                      : "bg-transparent"
-                  }`}
-                >
-                  <Text
-                    numberOfLines={1}
-                    className={`text-xs ${
-                      isActive
-                        ? "text-dark-text font-bold"
-                        : "text-dark-muted font-medium"
+          <View className="mb-6">
+            <Text className="text-dark-muted text-xs font-bold uppercase tracking-wider mb-4">
+              State
+            </Text>
+            <View className="flex-row flex-wrap gap-2.5">
+              {(
+                [
+                  { id: "ALL", label: "All" },
+                  { id: "ONGOING", label: "Ongoing" },
+                  { id: "REPAID", label: "Repaid" },
+                  { id: "WRITTEN_OFF", label: "Written Off" },
+                ] as const
+              ).map((item) => {
+                const isSelected = draftFilters.state === item.id;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() =>
+                      setDraftFilters((prev) => ({ ...prev, state: item.id }))
+                    }
+                    activeOpacity={0.7}
+                    className={`px-4 py-2.5 rounded-2xl border ${
+                      isSelected
+                        ? "bg-dark-card border-brand-accent"
+                        : "bg-dark-surface/60 border-dark-border"
                     }`}
                   >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                    <Text
+                      className={`text-xs ${
+                        isSelected
+                          ? "text-brand-accent font-bold"
+                          : "text-dark-muted font-medium"
+                      }`}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
+        </ScrollView>
 
-          {/* Buttons: Reset & Apply */}
-          <View className="pt-2 flex-row gap-3">
-            {hasActiveFilters && (
-              <TouchableOpacity
-                onPress={handleResetFilters}
-                className="flex-1 py-4 rounded-2xl bg-dark-card border border-dark-border items-center justify-center"
-                activeOpacity={0.8}
-              >
-                <Text className="text-dark-text font-bold text-sm">
-                  Reset
-                </Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              onPress={handleApplyFilters}
-              className={`${hasActiveFilters ? "flex-1" : "w-full"} py-4 rounded-2xl bg-brand-accent items-center justify-center shadow-lg`}
-              activeOpacity={0.8}
-            >
-              <Text className="text-dark-bg font-extrabold text-base tracking-wide">
-                Apply
-              </Text>
-            </TouchableOpacity>
-          </View>
+        {/* Pinned Action Buttons: Apply & Reset (Always visible at bottom) */}
+        <View className="pt-3.5 pb-1 border-t border-dark-border/50 space-y-2.5 gap-2.5">
+          <TouchableOpacity
+            onPress={handleApplyFilters}
+            className="w-full py-4 rounded-2xl bg-brand-accent items-center justify-center shadow-lg active:opacity-90"
+            activeOpacity={0.8}
+          >
+            <Text className="text-dark-bg font-extrabold text-base tracking-wide">
+              Apply Filters
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleResetFilters}
+            className="w-full py-3.5 rounded-2xl bg-dark-card border border-dark-border items-center justify-center flex-row gap-2 active:bg-dark-surface"
+            activeOpacity={0.7}
+          >
+            <Ionicons name="refresh-outline" size={17} color="#F8FAFC" />
+            <Text className="text-dark-text font-bold text-sm">
+              Reset Filters
+            </Text>
+          </TouchableOpacity>
         </View>
       </HawkFlyUp>
     </SafeAreaView>

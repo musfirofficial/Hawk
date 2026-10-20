@@ -105,22 +105,30 @@ export const accounts = liquidAssets;
 // ==========================================
 // 2. Contacts Table (Persons / Companies)
 // ==========================================
-export const contacts = sqliteTable("contacts", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull().unique(),
-  mobileNumber: text("mobile_number"),
-  note: text("note"),
-  avatarSvg: text("avatar_svg"),
-  isArchived: integer("is_archived", { mode: "boolean" })
-    .default(false)
-    .notNull(), // Archive instead of deleting
-  createdAt: text("created_at")
-    .default(sql`(CURRENT_TIMESTAMP)`)
-    .notNull(),
-  updatedAt: text("updated_at")
-    .default(sql`(CURRENT_TIMESTAMP)`)
-    .notNull(),
-});
+export const contacts = sqliteTable(
+  "contacts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    mobileNumber: text("mobile_number"),
+    note: text("note"),
+    avatarSvg: text("avatar_svg"),
+    isArchived: integer("is_archived", { mode: "boolean" })
+      .default(false)
+      .notNull(), // Archive instead of deleting
+    createdAt: text("created_at")
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: text("updated_at")
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_contacts_active_name")
+      .on(sql`LOWER(${table.name})`)
+      .where(sql`${table.isArchived} = 0`),
+  ]
+);
 
 // ==========================================
 // 3. Categories Table
@@ -160,7 +168,11 @@ export const debts = sqliteTable("debts", {
     .notNull(),
 });
 
-export const DEBT_LOG_TYPES = ["AMOUNT_CHANGED", "SETTLED_MANUALLY"] as const;
+export const DEBT_LOG_TYPES = [
+  "AMOUNT_CHANGED",
+  "SETTLED_MANUALLY",
+  "REOPENED",
+] as const;
 export type DebtLogType = (typeof DEBT_LOG_TYPES)[number];
 
 export const debtLogs = sqliteTable("debt_logs", {
@@ -291,6 +303,10 @@ export const appSettings = sqliteTable("app_settings", {
     .notNull(),
   googleEmail: text("google_email"),
   googleName: text("google_name"),
+  lockoutUntil: text("lockout_until"),
+  failedRecoveryAttempts: integer("failed_recovery_attempts").default(0),
+  pinLockoutUntil: text("pin_lockout_until"),
+  failedPinAttempts: integer("failed_pin_attempts").default(0),
   createdAt: text("created_at")
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),

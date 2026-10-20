@@ -34,7 +34,7 @@ export function ensureDatabaseInitialized() {
       );
       CREATE TABLE IF NOT EXISTS contacts (
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-        name TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
         mobile_number TEXT,
         note TEXT,
         avatar_svg TEXT,
@@ -152,6 +152,22 @@ export function ensureDatabaseInitialized() {
       );
     } catch {}
     try {
+      expoDb.execSync("ALTER TABLE app_settings ADD COLUMN lockout_until TEXT;");
+    } catch {}
+    try {
+      expoDb.execSync(
+        "ALTER TABLE app_settings ADD COLUMN failed_recovery_attempts INTEGER DEFAULT 0 NOT NULL;"
+      );
+    } catch {}
+    try {
+      expoDb.execSync("ALTER TABLE app_settings ADD COLUMN pin_lockout_until TEXT;");
+    } catch {}
+    try {
+      expoDb.execSync(
+        "ALTER TABLE app_settings ADD COLUMN failed_pin_attempts INTEGER DEFAULT 0 NOT NULL;"
+      );
+    } catch {}
+    try {
       expoDb.execSync("ALTER TABLE debts ADD COLUMN settled_at TEXT;");
     } catch {}
     try {
@@ -190,9 +206,43 @@ export function ensureDatabaseInitialized() {
     try {
       expoDb.execSync("ALTER TABLE contacts ADD COLUMN avatar_svg TEXT;");
     } catch {}
+    // Migration: Migrate contacts table away from column-level UNIQUE constraint to partial unique index
+    try {
+      const tableInfo = expoDb.getFirstSync<{ sql: string }>(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'contacts';"
+      );
+      if (
+        tableInfo?.sql &&
+        /name\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i.test(tableInfo.sql)
+      ) {
+        expoDb.execSync(`
+          PRAGMA foreign_keys = OFF;
+          CREATE TABLE IF NOT EXISTS contacts_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            name TEXT NOT NULL,
+            mobile_number TEXT,
+            note TEXT,
+            avatar_svg TEXT,
+            is_archived INTEGER DEFAULT 0 NOT NULL,
+            created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+            updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+          );
+          INSERT INTO contacts_new (id, name, mobile_number, note, avatar_svg, is_archived, created_at, updated_at)
+          SELECT id, name, mobile_number, note, avatar_svg, is_archived, created_at, updated_at FROM contacts;
+          DROP TABLE contacts;
+          ALTER TABLE contacts_new RENAME TO contacts;
+          PRAGMA foreign_keys = ON;
+        `);
+      }
+    } catch (err) {
+      console.error("Migration error updating contacts table unique constraint:", err);
+    }
+    try {
+      expoDb.execSync("DROP INDEX IF EXISTS idx_contacts_name;");
+    } catch {}
     try {
       expoDb.execSync(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_name ON contacts (name);"
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_active_name ON contacts (LOWER(name)) WHERE is_archived = 0;"
       );
     } catch {}
 

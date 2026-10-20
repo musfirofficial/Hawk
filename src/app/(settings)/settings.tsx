@@ -58,21 +58,14 @@ export default function SettingsScreen() {
   // Google Account action
   async function handleGooglePress() {
     if (isGoogleConnected) {
-      showConfirm({
-        title: "Google Account",
-        message: `Connected as ${settings?.googleEmail}. Do you want to disconnect?`,
-        type: "warning",
-        confirmText: "Disconnect",
-        isDestructive: true,
-        onConfirm: () => disconnectGoogle(),
-      });
+      router.push("/google-account" as any);
       return;
     }
 
     if (!isGoogleAuthEnabled) {
       showAlert({
-        title: "Cloud Sync",
-        message: "Google Sign-In is disabled in config (ENABLE_GOOGLE_AUTH).",
+        title: "Google Account",
+        message: "Google Sign-In requires an APK or development build.",
         type: "info",
       });
       return;
@@ -194,6 +187,30 @@ export default function SettingsScreen() {
 
   const biometricIconName =
     bioCapability.type === "FACE_ID" ? "scan-outline" : "finger-print";
+
+  async function handleBackupRestorePress() {
+    if (!settings?.googleEmail) {
+      showConfirm({
+        title: "Connect Google",
+        message:
+          "Connect your Google account to back up and restore your data.",
+        confirmText: "Connect",
+        cancelText: "Cancel",
+        onConfirm: async () => {
+          try {
+            const user = await signInWithGoogle();
+            if (user) {
+              router.push("/backup-restore" as any);
+            }
+          } catch (e: any) {
+            console.warn("Google sign-in failed:", e);
+          }
+        },
+      });
+    } else {
+      router.push("/backup-restore" as any);
+    }
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-dark-bg" edges={["top", "bottom"]}>
@@ -331,7 +348,7 @@ export default function SettingsScreen() {
 
           {/* 2. Backup & Restore (Opens New Page) */}
           <TouchableOpacity
-            onPress={() => router.push("/backup-restore" as any)}
+            onPress={handleBackupRestorePress}
             className="p-4 flex-row items-center justify-between"
             activeOpacity={0.7}
           >

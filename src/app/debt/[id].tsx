@@ -603,21 +603,6 @@ export default function DebtDetailScreen() {
             <View className="mb-2">
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center gap-1.5">
-                  <Ionicons
-                    name={
-                      dueDateInfo.isExpired && isOngoing
-                        ? "alert-circle"
-                        : "calendar-outline"
-                    }
-                    size={15}
-                    color={
-                      !isOngoing
-                        ? isRepaid
-                          ? "#10B981"
-                          : "#F59E0B"
-                        : dueDateInfo.iconColor
-                    }
-                  />
                   <Text
                     className={`text-xs font-bold font-sans ${
                       !isOngoing
@@ -661,20 +646,20 @@ export default function DebtDetailScreen() {
             </View>
           ) : null}
         </View>
+
         {/* Centered round edit button */}
         {isOngoing ? (
-          <View className="items-center w-full">
-            <TouchableOpacity
-              onPress={() =>
-                safePush(`/createdebt?debtId=${debt.id}&mode=edit`)
-              }
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              activeOpacity={0.7}
-              className="w-8 h-8 rounded-full items-center justify-center bg-dark-surface/80 border border-dark-border active:bg-dark-card"
-            >
-              <Ionicons name="pencil" size={14} color="#e8e9e5ff" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => safePush(`/createdebt?debtId=${debt.id}&mode=edit`)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+            className="flex-row items-center justify-center gap-2 py-3 px-4 rounded-xl bg-dark-surface border border-dark-border active:bg-dark-card mb-6"
+          >
+            <Ionicons name="pencil-outline" size={16} color="#F8FAFC" />
+            <Text className="text-dark-text text-sm font-bold font-sans">
+              Edit Debt
+            </Text>
+          </TouchableOpacity>
         ) : null}
         {/* 3. Payment History Section */}
         <View className="mt-2">
@@ -771,6 +756,20 @@ export default function DebtDetailScreen() {
                           This debt was settled manually at{" "}
                           {formatTimestamp(l.createdAt)}
                           {l.note ? ` for "${l.note}"` : ""}
+                        </Text>
+                      </View>
+                    );
+                  }
+
+                  if (l.type === "REOPENED") {
+                    return (
+                      <View
+                        key={item.id}
+                        className="py-2.5 items-center justify-center px-4"
+                      >
+                        <Text className="text-dark-muted text-xs text-center font-sans">
+                          This debt was reopened at{" "}
+                          {formatTimestamp(l.createdAt)}
                         </Text>
                       </View>
                     );

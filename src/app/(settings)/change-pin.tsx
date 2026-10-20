@@ -18,7 +18,7 @@ export default function ChangePinScreen() {
 
     router.replace({
       pathname: "/(auth)/recovery-key",
-      params: { recoveryKey: newRecoveryKey },
+      params: { recoveryKey: newRecoveryKey, origin: "settings" },
     });
   }
 
@@ -37,6 +37,13 @@ export default function ChangePinScreen() {
       onBack={() => router.back()}
       showSkip={false}
       isChangePin={hasExistingPin}
+      showResetPin={hasExistingPin}
+      onResetPinPress={() =>
+        router.push({
+          pathname: "/(auth)/verify-code",
+          params: { origin: "settings" },
+        } as any)
+      }
     />
   );
 }

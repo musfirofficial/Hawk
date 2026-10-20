@@ -102,7 +102,11 @@ export default function HomeScreen() {
           {/* Top Row: Today Summary & Actions (Eye + Add Account) */}
           <View className="flex-row items-center justify-between mb-1">
             {/* Functional Today Flow Indicator (Replaces Total Liquid Assets text) */}
-            <View className="flex-row items-center bg-dark-bg/15 px-3 py-1.5 rounded-full gap-1.5">
+            <TouchableOpacity
+              onPress={() => router.push("/fulltransaction" as any)}
+              activeOpacity={0.7}
+              className="flex-row items-center bg-dark-bg/15 px-3 py-1.5 rounded-full gap-1.5"
+            >
               <Ionicons
                 name={todayNetChange >= 0 ? "trending-up" : "trending-down"}
                 size={14}
@@ -110,14 +114,14 @@ export default function HomeScreen() {
               />
               <Text className="text-dark-bg font-bold text-xs">
                 {showBalance
-                  ? `${todayNetChange >= 0 ? "+" : ""}${formatCurrency(
+                  ? `${todayNetChange > 0 ? "+" : ""}${formatCurrency(
                       todayNetChange,
                       settings?.currency,
                       settings?.numberFormat,
                     )} today`
                   : "••••••• today"}
               </Text>
-            </View>
+            </TouchableOpacity>
 
             {/* Actions: Eye Toggler & Add Account Button */}
             <View className="flex-row items-center gap-2">

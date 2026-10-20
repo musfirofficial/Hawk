@@ -5,17 +5,13 @@ import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ContactAvatar } from "../../components/ContactAvatar";
 import { SearchBar } from "../../components/SearchBar";
-import { Editcontact } from "../../components/contacts/Editcontact";
-import { ContactItem, useContacts } from "../../context/contacts";
+import { useContacts } from "../../context/contacts";
 
 export default function ContactsScreen() {
   const router = useSafeRouter();
   const { contacts } = useContacts();
 
   const [search, setSearch] = useState("");
-  const [selectedContact, setSelectedContact] = useState<ContactItem | null>(
-    null,
-  );
 
   const filteredContacts = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -89,9 +85,9 @@ export default function ContactsScreen() {
               {sortedContacts.map((contact) => (
                 <TouchableOpacity
                   key={contact.id}
-                  onPress={() => setSelectedContact(contact)}
+                  onPress={() => router.push(`/contact/${contact.id}` as any)}
                   activeOpacity={0.7}
-                  className="bg-dark-surface p-3.5 rounded-2xl border border-dark-border flex-row items-center justify-between"
+                  className="bg-dark-surface p-3.5 rounded-2xl border border-dark-border flex-row items-center"
                 >
                   <View className="flex-row items-center gap-3.5 flex-1 pr-2">
                     <ContactAvatar
@@ -106,21 +102,12 @@ export default function ContactsScreen() {
                       {contact.name}
                     </Text>
                   </View>
-
-                  <Ionicons name="chevron-forward" size={18} color="#60677C" />
                 </TouchableOpacity>
               ))}
             </View>
           )}
         </ScrollView>
       </View>
-
-      {/* Edit Contact Modal */}
-      <Editcontact
-        visible={Boolean(selectedContact)}
-        contact={selectedContact}
-        onClose={() => setSelectedContact(null)}
-      />
     </SafeAreaView>
   );
 }

@@ -184,28 +184,17 @@ export function SecurityGuardModal({
                   `Authenticate with ${biometricLabel} to complete verification`}
               </Text>
 
-              {/* Verify Button */}
-              <TouchableOpacity
-                onPress={handleManualBiometric}
-                className="w-full py-4 rounded-full bg-brand-accent items-center justify-center mb-3 shadow-lg active:opacity-90"
-                activeOpacity={0.8}
-              >
-                <Text className="text-dark-bg font-bold text-sm tracking-wide">
-                  Verify with {biometricLabel}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Use PIN Link (Switches to Compact PIN View) */}
+              {/* Use PIN Button */}
               <TouchableOpacity
                 onPress={() => {
                   setErrorMsg(null);
                   setViewMode("PIN");
                 }}
-                className="py-2.5 px-4 mb-2"
-                activeOpacity={0.7}
+                className="w-full py-4 rounded-full bg-brand-accent items-center justify-center mb-3 shadow-lg active:opacity-90"
+                activeOpacity={0.8}
               >
-                <Text className="text-brand-accent font-semibold text-sm">
-                  Use your PIN
+                <Text className="text-dark-bg font-bold text-sm tracking-wide">
+                  Use PIN
                 </Text>
               </TouchableOpacity>
 

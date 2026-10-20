@@ -42,6 +42,7 @@ export interface SetUpPinProps {
   skipLabel?: string;
   isChangePin?: boolean;
   showResetPin?: boolean;
+  onResetPinPress?: () => void;
   mode?: "setup" | "verify";
   showBiometric?: boolean;
   biometricType?: BiometricAuthType;
@@ -69,6 +70,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
       skipLabel = "Set up PIN later",
       isChangePin = false,
       showResetPin = isChangePin,
+      onResetPinPress,
       mode = "setup",
       showBiometric = false,
       biometricType = null,
@@ -77,7 +79,12 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
     },
     ref,
   ) {
-    const { settings } = useAuth();
+    const {
+      settings,
+      getPinLockoutSeconds,
+      recordFailedPinAttempt,
+      resetPinAttempts,
+    } = useAuth();
     const hasExistingPin = Boolean(isChangePin && settings?.pin);
 
     const [step, setStep] = useState<PinStep>(
@@ -89,6 +96,30 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [saving, setSaving] = useState(false);
     const [isResetMode, setIsResetMode] = useState(false);
+    const [pinLockoutSeconds, setPinLockoutSeconds] = useState(0);
+
+    // Check initial PIN lockout state
+    useEffect(() => {
+      const remaining = getPinLockoutSeconds();
+      if (remaining > 0) {
+        setPinLockoutSeconds(remaining);
+      }
+    }, [getPinLockoutSeconds]);
+
+    // PIN lockout countdown timer
+    useEffect(() => {
+      if (pinLockoutSeconds <= 0) return;
+      const interval = setInterval(() => {
+        setPinLockoutSeconds((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }, [pinLockoutSeconds]);
 
     // Reset PIN Modal state
     const [isResetModalVisible, setIsResetModalVisible] = useState(false);
@@ -211,6 +242,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
               }
 
               if (isValid) {
+                await resetPinAttempts();
                 setTimeout(() => {
                   onSuccess(next, false);
                 }, 150);
@@ -218,7 +250,13 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
                 if (Platform.OS !== "web") {
                   Vibration.vibrate(150);
                 }
-                setErrorMsg("Incorrect PIN. Please try again.");
+                const res = await recordFailedPinAttempt();
+                if (res.lockedOut) {
+                  setPinLockoutSeconds(res.remainingSeconds);
+                  setErrorMsg(`Too many attempts. Try again in ${res.remainingSeconds}s`);
+                } else {
+                  setErrorMsg("Incorrect PIN. Please try again.");
+                }
                 setTimeout(() => {
                   setCurrentPin("");
                   setIsSubmitting(false);
@@ -231,22 +269,32 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
             }
           })();
         } else if (step === "CURRENT") {
-          if (settings?.pin && next === settings.pin) {
-            setIsSubmitting(true);
-            setTimeout(() => {
-              setStep("CREATE");
-              setCurrentPin("");
-              setIsSubmitting(false);
-            }, 180);
-          } else {
-            if (Platform.OS !== "web") {
-              Vibration.vibrate(150);
+          (async () => {
+            if (settings?.pin && next === settings.pin) {
+              await resetPinAttempts();
+              setIsSubmitting(true);
+              setTimeout(() => {
+                setStep("CREATE");
+                setCurrentPin("");
+                setIsSubmitting(false);
+              }, 180);
+            } else {
+              if (Platform.OS !== "web") {
+                Vibration.vibrate(150);
+              }
+              const res = await recordFailedPinAttempt();
+              if (res.lockedOut) {
+                setPinLockoutSeconds(res.remainingSeconds);
+                setErrorMsg(`Too many attempts. Try again in ${res.remainingSeconds}s`);
+              } else {
+                setErrorMsg("Incorrect current PIN. Please try again.");
+              }
+              setTimeout(() => {
+                setCurrentPin("");
+                setIsSubmitting(false);
+              }, 350);
             }
-            setErrorMsg("Incorrect current PIN. Please try again.");
-            setTimeout(() => {
-              setCurrentPin("");
-            }, 350);
-          }
+          })();
         } else if (step === "CREATE") {
           setIsSubmitting(true);
           setTimeout(() => {
@@ -333,7 +381,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
       displaySubtitle = confirmSubtitle;
     }
 
-    const isPadDisabled = isSubmitting || saving;
+    const isPadDisabled = isSubmitting || saving || pinLockoutSeconds > 0;
 
     const Content = (
       <View className="flex-1 bg-dark-bg justify-between px-6 pt-4 pb-8">
@@ -385,7 +433,11 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
             })}
           </View>
 
-          {errorMsg ? (
+          {pinLockoutSeconds > 0 ? (
+            <Text className="text-brand-expense text-xs font-semibold text-center mt-2">
+              Too many attempts. Try again in {pinLockoutSeconds}s
+            </Text>
+          ) : errorMsg ? (
             <Text className="text-brand-expense text-xs font-semibold text-center mt-2">
               {errorMsg}
             </Text>
@@ -485,10 +537,14 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
             </TouchableOpacity>
           )}
 
-          {showResetPin && step === "CURRENT" && (
+          {showResetPin && (step === "CURRENT" || step === "VERIFY") && (
             <TouchableOpacity
               disabled={isResetModalVisible}
               onPress={() => {
+                if (onResetPinPress) {
+                  onResetPinPress();
+                  return;
+                }
                 if (isResetModalVisible) return;
                 setResetCode("");
                 setResetError(null);

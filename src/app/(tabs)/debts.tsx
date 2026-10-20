@@ -13,7 +13,7 @@ export default function DebtsScreen() {
   const { debts, totalLentRemaining, totalBorrowedRemaining } = useDebts();
   const { settings } = useAuth();
 
-  const [showBalance, setShowBalance] = useState(true);
+  const [showBalance, setShowBalance] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<DebtItem | null>(null);
 
   // Total receivable minus borrowed (Debt State)

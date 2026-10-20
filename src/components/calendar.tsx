@@ -36,6 +36,102 @@ export function getTodayYMD(): string {
   return formatYMD(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
+/**
+ * Converts local date (YYYY-MM-DD) and 12-hour time string ("hh:mm AM/PM")
+ * into a proper ISO-8601 UTC timestamp based on the device's local timezone.
+ */
+export function localDateTimeToIso(
+  dateStr: string,
+  timeStr?: string | null
+): string {
+  if (!dateStr) return new Date().toISOString();
+  const { year, month, day } = parseYMD(dateStr);
+  const now = new Date();
+  const today = getTodayYMD();
+  let h = 12;
+  let min = 0;
+  let sec = 0;
+
+  if (timeStr && timeStr.includes(":")) {
+    const parts = timeStr.trim().split(" ");
+    const hm = (parts[0] || "").split(":");
+    let parsedH = parseInt(hm[0], 10);
+    const parsedM = parseInt(hm[1], 10) || 0;
+    if (parts[1] === "PM" && parsedH < 12) parsedH += 12;
+    if (parts[1] === "AM" && parsedH === 12) parsedH = 0;
+    if (!isNaN(parsedH)) h = parsedH;
+    if (!isNaN(parsedM)) min = parsedM;
+
+    // If the selected date, hour, and minute match current local time, preserve the current seconds
+    if (
+      dateStr === today &&
+      h === now.getHours() &&
+      min === now.getMinutes()
+    ) {
+      sec = now.getSeconds();
+    }
+  }
+  const dt = new Date(year, month, day, h, min, sec, 0);
+  return dt.toISOString();
+}
+
+/**
+ * Parses an ISO-8601 timestamp and extracts local 12-hour time components.
+ */
+export function parseIsoToTimeInfo(isoString?: string | null): {
+  hour12: number;
+  minute: number;
+  period: "AM" | "PM";
+} {
+  const now = new Date();
+  if (!isoString) {
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const period: "AM" | "PM" = hours >= 12 ? "PM" : "AM";
+    const hour12 = hours % 12 || 12;
+    return { hour12, minute: minutes, period };
+  }
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) {
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const period: "AM" | "PM" = hours >= 12 ? "PM" : "AM";
+    const hour12 = hours % 12 || 12;
+    return { hour12, minute: minutes, period };
+  }
+  const hours = d.getHours();
+  const minutes = d.getMinutes();
+  const period: "AM" | "PM" = hours >= 12 ? "PM" : "AM";
+  const hour12 = hours % 12 || 12;
+  return { hour12, minute: minutes, period };
+}
+
+/**
+ * Checks whether the specified date and time is in the future.
+ */
+export function isFutureTime(
+  dateYMD: string,
+  hour12: number,
+  minute: number,
+  period: "AM" | "PM"
+): boolean {
+  const today = getTodayYMD();
+  if (dateYMD > today) return true;
+  if (dateYMD < today) return false;
+
+  const now = new Date();
+  let selectedH = hour12;
+  if (period === "PM" && selectedH < 12) selectedH += 12;
+  if (period === "AM" && selectedH === 12) selectedH = 0;
+
+  const currentH = now.getHours();
+  const currentM = now.getMinutes();
+
+  if (selectedH > currentH) return true;
+  if (selectedH === currentH && minute > currentM) return true;
+  return false;
+}
+
 export function formatDisplayDate(dateStr?: string): string {
   if (!dateStr) return "";
   const { year, month, day } = parseYMD(dateStr);

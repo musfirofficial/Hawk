@@ -21,7 +21,14 @@ import { useSecurityGuard } from "../../context/security";
 import { TransactionItem, useTransactions } from "../../context/transactions";
 import { LiquidAssetType, TransactionType } from "../../db/schema";
 import { formatCurrency, getCurrencySymbol } from "../../services/currency";
-import { Calendar, formatDisplayDate, getTodayYMD } from "../calendar";
+import {
+  Calendar,
+  formatDisplayDate,
+  getTodayYMD,
+  isFutureTime,
+  localDateTimeToIso,
+  parseIsoToTimeInfo,
+} from "../calendar";
 import { ContactAvatar } from "../ContactAvatar";
 import { CreateContact } from "../contacts/CreateContact";
 import { HawkFlyUp } from "../HawkFlyUp";
@@ -157,6 +164,10 @@ export function TransactionForm({
       setCategoryId(initialData.categoryId ?? null);
       setContactId(initialData.contactId ?? null);
       setDate(initialData.date || getTodayYMD());
+      if (initialData.createdAt) {
+        const t = parseIsoToTimeInfo(initialData.createdAt);
+        setTime(formatTime(t.hour12, t.minute, t.period));
+      }
       setNote(initialData.note || "");
       setIsEditing(false);
     }
@@ -171,6 +182,10 @@ export function TransactionForm({
       setCategoryId(initialData.categoryId ?? null);
       setContactId(initialData.contactId ?? null);
       setDate(initialData.date || getTodayYMD());
+      if (initialData.createdAt) {
+        const t = parseIsoToTimeInfo(initialData.createdAt);
+        setTime(formatTime(t.hour12, t.minute, t.period));
+      }
       setNote(initialData.note || "");
     }
     setError(null);
@@ -200,6 +215,14 @@ export function TransactionForm({
     () => contacts.find((c) => c.id === contactId),
     [contacts, contactId],
   );
+
+  const contactDisplayName = useMemo(() => {
+    if (selectedContact) return selectedContact.name;
+    if (initialData?.contactId && contactId === initialData.contactId) {
+      return initialData.contactName || null;
+    }
+    return null;
+  }, [selectedContact, contactId, initialData?.contactId, initialData?.contactName]);
 
   const parsedAmount = parseFloat(amount) || 0;
   const isAmountEntered = parsedAmount > 0;
@@ -392,6 +415,16 @@ export function TransactionForm({
     if (isNaN(m) || m < 0) m = tempMinute || 0;
     if (m > 59) m = 59;
 
+    const today = getTodayYMD();
+    if (tempDate === today && isFutureTime(tempDate, h, m, tempPeriod)) {
+      showAlert({
+        title: "Invalid Time",
+        message: "You cannot select a time later than the current time.",
+        type: "danger",
+      });
+      return;
+    }
+
     setDate(tempDate);
     setTime(formatTime(h, m, tempPeriod));
     setIsDateTimeSheetOpen(false);
@@ -458,6 +491,9 @@ export function TransactionForm({
       description: "Verify your identity to proceed.",
       onSuccess: async () => {
         try {
+          const txDate = date || getTodayYMD();
+          const createdAtTimestamp = localDateTimeToIso(txDate, time);
+
           if (mode === "create") {
             await createTransaction({
               amount: parsedAmount,
@@ -466,7 +502,8 @@ export function TransactionForm({
               toAssetId: type === "EXPENSE" ? null : toAssetId,
               categoryId: type === "TRANSFER" ? null : categoryId,
               contactId: contactId || null,
-              date: date || getTodayYMD(),
+              date: txDate,
+              createdAt: createdAtTimestamp,
               note: note.trim() || null,
             });
           } else if (mode === "edit" && initialData) {
@@ -477,7 +514,8 @@ export function TransactionForm({
               toAssetId: type === "EXPENSE" ? null : toAssetId,
               categoryId: type === "TRANSFER" ? null : categoryId,
               contactId: contactId || null,
-              date: date || getTodayYMD(),
+              date: txDate,
+              createdAt: createdAtTimestamp,
               note: note.trim() || null,
             });
           }
@@ -780,11 +818,11 @@ export function TransactionForm({
           ) : null}
 
           {/* 6. Contacts (Hidden for Transfer) */}
-          {type !== "TRANSFER" && (isEditing || selectedContact) ? (
+          {type !== "TRANSFER" && (isEditing || contactDisplayName) ? (
             <FieldRow
               icon="person-outline"
               label="Contact"
-              value={selectedContact?.name}
+              value={contactDisplayName}
               placeholder="Optional"
               disabled={!isEditing}
               isReadOnly={!isEditing}
@@ -1043,11 +1081,8 @@ export function TransactionForm({
             <View className="mt-4">
               <TouchableOpacity
                 onPress={handleConfirmAccount}
-                disabled={!tempAssetId}
                 activeOpacity={0.8}
-                className={`w-full py-3.5 rounded-2xl items-center justify-center ${
-                  tempAssetId ? "bg-brand-accent" : "bg-dark-surface opacity-50"
-                }`}
+                className="w-full py-3.5 rounded-2xl items-center justify-center bg-brand-accent"
               >
                 <Text className="text-dark-bg font-bold text-base">Done</Text>
               </TouchableOpacity>

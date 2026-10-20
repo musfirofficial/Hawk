@@ -11,8 +11,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../context/auth";
 
+import { useSafeRouter } from "../../hooks/useSafeRouter";
+
 export default function LoginScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const { signInWithGoogle, isGoogleAuthEnabled } = useAuth();
   const [signingIn, setSigningIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -20,7 +22,7 @@ export default function LoginScreen() {
   async function handleGoogleConnect() {
     if (!isGoogleAuthEnabled) {
       setErrorMsg(
-        "Google Sign-In is currently disabled. Toggle ENABLE_GOOGLE_AUTH in src/config/appConfig.ts to enable.",
+        "Google Sign-In requires an APK or development build. You can tap 'Set up Later' to continue offline.",
       );
       return;
     }
@@ -28,8 +30,10 @@ export default function LoginScreen() {
     try {
       setSigningIn(true);
       setErrorMsg(null);
-      await signInWithGoogle();
-      router.push("/(auth)/onboarding");
+      const res = await signInWithGoogle();
+      if (res) {
+        router.safePush("/(auth)/onboarding" as any);
+      }
     } catch (err: any) {
       if (err?.code === "12501" || err?.message?.includes("Canceled")) {
         return;
@@ -41,7 +45,7 @@ export default function LoginScreen() {
   }
 
   function handleSetUpLater() {
-    router.push("/(auth)/onboarding");
+    router.safePush("/(auth)/onboarding" as any);
   }
 
   return (

@@ -65,7 +65,7 @@ TextInput.defaultProps.style = [
 ];
 
 function NavigationGate() {
-  const { hasOnboarded, isLoading } = useAuth();
+  const { hasOnboarded, isLoading, settings, isAppUnlocked } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -106,16 +106,44 @@ function NavigationGate() {
 
     const isExemptAuthScreen =
       segmentList.includes("recovery-key") ||
-      segmentList.includes("setup-pin");
+      segmentList.includes("setup-pin") ||
+      segmentList.includes("verify-code") ||
+      segmentList.includes("change-code");
 
     if (!hasOnboarded && !inAuthGroup) {
       // User hasn't finished onboarding yet
       router.replace("/(auth)/login");
+      return;
+    }
+
+    const appLockEnabled = Boolean(settings?.appLockEnabled);
+    const pinEnabled = Boolean(settings?.pinEnabled);
+    const hasPin = Boolean(settings?.pin);
+
+    const shouldLock = Boolean(
+      hasOnboarded && appLockEnabled && pinEnabled && hasPin
+    );
+
+    if (shouldLock && !isAppUnlocked) {
+      // If locked, allow ONLY the dedicated PIN reset flow screens
+      if (!isExemptAuthScreen) {
+        router.replace("/");
+        return;
+      }
     } else if (hasOnboarded && inAuthGroup && !isExemptAuthScreen) {
-      // User has already completed onboarding, block login/onboarding
+      // User has completed onboarding and session is unlocked, block login/onboarding
       router.replace("/(tabs)");
     }
-  }, [hasOnboarded, isLoading, segments]);
+  }, [
+    hasOnboarded,
+    isLoading,
+    Boolean(settings?.appLockEnabled),
+    Boolean(settings?.pinEnabled),
+    Boolean(settings?.pin),
+    isAppUnlocked,
+    segments,
+    router,
+  ]);
 
   return (
     <>
@@ -190,6 +218,13 @@ function NavigationGate() {
         />
         <Stack.Screen
           name="debt/[id]"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+        <Stack.Screen
+          name="contact/[id]"
           options={{
             headerShown: false,
             presentation: "card",

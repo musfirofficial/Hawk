@@ -11,6 +11,7 @@ import React, {
 import { db, ensureDatabaseInitialized, expoDb } from "../db";
 import * as schema from "../db/schema";
 import { DebtState, DebtType } from "../db/schema";
+import { localDateTimeToIso } from "../components/calendar";
 
 export interface DebtItem {
   id: number;
@@ -35,7 +36,7 @@ export interface DebtItem {
 export interface DebtLogItem {
   id: number;
   debtId: number;
-  type: "AMOUNT_CHANGED" | "SETTLED_MANUALLY";
+  type: "AMOUNT_CHANGED" | "SETTLED_MANUALLY" | "REOPENED";
   oldAmount: number | null;
   newAmount: number | null;
   note: string | null;
@@ -83,6 +84,7 @@ export interface RecordRepaymentInput {
   assetId: number;
   note?: string | null;
   date?: string;
+  time?: string;
 }
 
 interface DebtsContextType {
@@ -163,7 +165,7 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
           ), 0) AS repayment_count
         FROM debts d
         LEFT JOIN contacts c ON c.id = d.contact_id
-        ORDER BY d.created_at DESC;
+        ORDER BY d.created_at DESC, d.id DESC;
       `);
 
       const mapped: DebtItem[] = rows.map((row) => {
@@ -229,22 +231,9 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
       const now = new Date().toISOString();
       const dateString = data.date || now.split("T")[0];
 
-      let createdAtTimestamp = now;
-      if (data.date) {
-        if (data.time && data.time.includes(":")) {
-          const parts = data.time.trim().split(" ");
-          const hm = (parts[0] || "").split(":");
-          let h = parseInt(hm[0], 10);
-          const m = parseInt(hm[1], 10) || 0;
-          if (parts[1] === "PM" && h < 12) h += 12;
-          if (parts[1] === "AM" && h === 12) h = 0;
-          const hh = String(h).padStart(2, "0");
-          const mm = String(m).padStart(2, "0");
-          createdAtTimestamp = `${data.date}T${hh}:${mm}:00.000Z`;
-        } else {
-          createdAtTimestamp = `${data.date}T12:00:00.000Z`;
-        }
-      }
+      const createdAtTimestamp = data.date
+        ? localDateTimeToIso(data.date, data.time)
+        : now;
 
       const inserted = db
         .insert(schema.debts)
@@ -345,19 +334,7 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
 
       let newCreatedAt: string | undefined = undefined;
       if (data.date) {
-        if (data.time && data.time.includes(":")) {
-          const parts = data.time.trim().split(" ");
-          const hm = (parts[0] || "").split(":");
-          let h = parseInt(hm[0], 10);
-          const m = parseInt(hm[1], 10) || 0;
-          if (parts[1] === "PM" && h < 12) h += 12;
-          if (parts[1] === "AM" && h === 12) h = 0;
-          const hh = String(h).padStart(2, "0");
-          const mm = String(m).padStart(2, "0");
-          newCreatedAt = `${data.date}T${hh}:${mm}:00.000Z`;
-        } else {
-          newCreatedAt = `${data.date}T12:00:00.000Z`;
-        }
+        newCreatedAt = localDateTimeToIso(data.date, data.time);
         updateValues.createdAt = newCreatedAt;
       }
 
@@ -459,6 +436,11 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
       const isLend = debt.type === "LEND";
       const txType = isLend ? "DEBT RECEIVED" : "DEBT PAID";
 
+      let createdAtTimestamp = now;
+      if (data.date) {
+        createdAtTimestamp = localDateTimeToIso(data.date, data.time);
+      }
+
       db.insert(schema.transactions)
         .values({
           amount: Number(data.amount) || 0,
@@ -469,7 +451,7 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
           debtId: debt.id,
           date: dateString,
           note: data.note?.trim() || (isLend ? "Debt Repayment Received" : "Debt Repayment Paid"),
-          createdAt: now,
+          createdAt: createdAtTimestamp,
           updatedAt: now,
         })
         .run();
@@ -544,6 +526,15 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
             createdAt: now,
           })
           .run();
+      } else {
+        db.insert(schema.debtLogs)
+          .values({
+            debtId: id,
+            type: "REOPENED",
+            note: "Debt reopened",
+            createdAt: now,
+          })
+          .run();
       }
 
       const nextState = isCurrentlyWrittenOff
@@ -574,7 +565,7 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
         `SELECT id, debt_id as debtId, type, old_amount as oldAmount, new_amount as newAmount, note, created_at as createdAt 
          FROM debt_logs 
          WHERE debt_id = ? 
-         ORDER BY created_at DESC;`,
+         ORDER BY created_at DESC, id DESC;`,
         [debtId]
       );
       return rows;
@@ -597,7 +588,7 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
          LEFT JOIN liquid_assets fa ON fa.id = t.from_asset_id
          LEFT JOIN liquid_assets ta ON ta.id = t.to_asset_id
          WHERE t.debt_id = ?
-         ORDER BY t.date DESC, t.created_at DESC;`,
+         ORDER BY t.date DESC, t.created_at DESC, t.id DESC;`,
         [debtId]
       );
       return rows;

@@ -1,8 +1,11 @@
+import Constants, { ExecutionEnvironment } from "expo-constants";
+
 /**
  * Hawk Feature Flags & Configuration
  *
- * ⚙️ HOW TO TOGGLE GOOGLE AUTH:
- * - false: 100% Offline Mode (Recommended for rapid development in Expo Go)
- * - true:  Full Google Sign-in & Drive Backup (Use when testing with `npx expo run:android` or EAS build)
+ * - In Expo Go (StoreClient), native Google Sign-in is not bundled.
+ * - In testing/production builds (APK) and development builds, Google Sign-In is automatically enabled.
  */
-export const ENABLE_GOOGLE_AUTH = false;
+export const ENABLE_GOOGLE_AUTH =
+  Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
+

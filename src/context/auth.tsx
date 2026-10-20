@@ -28,6 +28,22 @@ interface AuthContextType {
   settings: AppSettings | null;
   isLoading: boolean;
   hasOnboarded: boolean;
+  isAppUnlocked: boolean;
+  unlockApp: () => void;
+  isRecoverySessionVerified: boolean;
+  setRecoverySessionVerified: (verified: boolean) => void;
+  recordFailedRecoveryAttempt: () => Promise<{
+    lockedOut: boolean;
+    remainingSeconds: number;
+  }>;
+  resetRecoveryAttempts: () => Promise<void>;
+  getRecoveryLockoutSeconds: () => number;
+  recordFailedPinAttempt: () => Promise<{
+    lockedOut: boolean;
+    remainingSeconds: number;
+  }>;
+  resetPinAttempts: () => Promise<void>;
+  getPinLockoutSeconds: () => number;
   isGoogleAuthEnabled: boolean;
   pendingGoogleUser: GoogleUserInfo | null;
   setPendingGoogleUser: (user: GoogleUserInfo | null) => void;
@@ -60,6 +76,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [hasOnboarded, setHasOnboarded] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isAppUnlocked, setIsAppUnlocked] = useState<boolean>(false);
+  const [isRecoverySessionVerified, setRecoverySessionVerified] =
+    useState<boolean>(false);
   const [pendingGoogleUser, setPendingGoogleUser] =
     useState<GoogleUserInfo | null>(null);
 
@@ -263,12 +282,166 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  function unlockApp() {
+    setIsAppUnlocked(true);
+  }
+
+  function getRecoveryLockoutSeconds(): number {
+    if (!settings?.lockoutUntil) return 0;
+    const target = Number(settings.lockoutUntil);
+    if (isNaN(target)) return 0;
+    const diff = Math.ceil((target - Date.now()) / 1000);
+    return diff > 0 ? diff : 0;
+  }
+
+  async function recordFailedRecoveryAttempt(): Promise<{
+    lockedOut: boolean;
+    remainingSeconds: number;
+  }> {
+    try {
+      ensureDatabaseInitialized();
+      const existing = db.select().from(schema.appSettings).limit(1).all();
+      if (existing.length === 0)
+        return { lockedOut: false, remainingSeconds: 0 };
+      const currentAttempts =
+        (existing[0].failedRecoveryAttempts || 0) + 1;
+      const now = Date.now();
+
+      if (currentAttempts >= 5) {
+        const lockoutEpoch = now + 30 * 1000; // 30-second lockout
+        db.update(schema.appSettings)
+          .set({
+            failedRecoveryAttempts: currentAttempts,
+            lockoutUntil: String(lockoutEpoch),
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(schema.appSettings.id, existing[0].id))
+          .run();
+        loadSettingsFromDB();
+        return { lockedOut: true, remainingSeconds: 30 };
+      } else {
+        db.update(schema.appSettings)
+          .set({
+            failedRecoveryAttempts: currentAttempts,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(schema.appSettings.id, existing[0].id))
+          .run();
+        loadSettingsFromDB();
+        return { lockedOut: false, remainingSeconds: 0 };
+      }
+    } catch (err) {
+      console.error("Failed to record recovery attempt:", err);
+      return { lockedOut: false, remainingSeconds: 0 };
+    }
+  }
+
+  async function resetRecoveryAttempts() {
+    try {
+      ensureDatabaseInitialized();
+      const existing = db.select().from(schema.appSettings).limit(1).all();
+      if (existing.length > 0) {
+        db.update(schema.appSettings)
+          .set({
+            failedRecoveryAttempts: 0,
+            lockoutUntil: null,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(schema.appSettings.id, existing[0].id))
+          .run();
+        loadSettingsFromDB();
+      }
+    } catch (err) {
+      console.error("Failed to reset recovery attempts:", err);
+    }
+  }
+
+  function getPinLockoutSeconds(): number {
+    if (!settings?.pinLockoutUntil) return 0;
+    const target = Number(settings.pinLockoutUntil);
+    if (isNaN(target)) return 0;
+    const diff = Math.ceil((target - Date.now()) / 1000);
+    return diff > 0 ? diff : 0;
+  }
+
+  async function recordFailedPinAttempt(): Promise<{
+    lockedOut: boolean;
+    remainingSeconds: number;
+  }> {
+    try {
+      ensureDatabaseInitialized();
+      const existing = db.select().from(schema.appSettings).limit(1).all();
+      if (existing.length === 0)
+        return { lockedOut: false, remainingSeconds: 0 };
+      const currentAttempts =
+        (existing[0].failedPinAttempts || 0) + 1;
+      const now = Date.now();
+
+      if (currentAttempts >= 5) {
+        const lockoutEpoch = now + 30 * 1000; // 30-second lockout
+        db.update(schema.appSettings)
+          .set({
+            failedPinAttempts: currentAttempts,
+            pinLockoutUntil: String(lockoutEpoch),
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(schema.appSettings.id, existing[0].id))
+          .run();
+        loadSettingsFromDB();
+        return { lockedOut: true, remainingSeconds: 30 };
+      } else {
+        db.update(schema.appSettings)
+          .set({
+            failedPinAttempts: currentAttempts,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(schema.appSettings.id, existing[0].id))
+          .run();
+        loadSettingsFromDB();
+        return { lockedOut: false, remainingSeconds: 0 };
+      }
+    } catch (err) {
+      console.error("Failed to record PIN attempt:", err);
+      return { lockedOut: false, remainingSeconds: 0 };
+    }
+  }
+
+  async function resetPinAttempts() {
+    try {
+      ensureDatabaseInitialized();
+      const existing = db.select().from(schema.appSettings).limit(1).all();
+      if (existing.length > 0) {
+        db.update(schema.appSettings)
+          .set({
+            failedPinAttempts: 0,
+            pinLockoutUntil: null,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(schema.appSettings.id, existing[0].id))
+          .run();
+        loadSettingsFromDB();
+      }
+    } catch (err) {
+      console.error("Failed to reset PIN attempts:", err);
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
         settings,
         isLoading,
         hasOnboarded,
+        isAppUnlocked,
+        unlockApp,
+        isRecoverySessionVerified,
+        setRecoverySessionVerified,
+        recordFailedRecoveryAttempt,
+        resetRecoveryAttempts,
+        getRecoveryLockoutSeconds,
+        recordFailedPinAttempt,
+        resetPinAttempts,
+        getPinLockoutSeconds,
         isGoogleAuthEnabled: ENABLE_GOOGLE_AUTH,
         pendingGoogleUser,
         setPendingGoogleUser,

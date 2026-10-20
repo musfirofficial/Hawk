@@ -197,7 +197,7 @@ export default function FullTransactionScreen() {
     setVisibleCount(PAGE_SIZE);
   }, [filters, isCalendarApplied, selectedDate, periodMode, searchQuery]);
 
-  // ── Card Transactions (Today stats by default; selected date/month if calendar applied) ──
+  // ── Card Transactions (Whole time stats by default; selected date/month if calendar applied) ──
   const cardTransactions = useMemo(() => {
     return transactions.filter((t) => {
       // Hardcoded filters
@@ -217,11 +217,8 @@ export default function FullTransactionScreen() {
         if (!filters.types.includes(t.type)) return false;
       }
 
-      // If calendar is not applied, card shows TODAY'S stats
-      if (!isCalendarApplied) {
-        if (t.date !== todayYMD) return false;
-      } else {
-        // Calendar slice
+      // Calendar slice — only when calendar is explicitly applied
+      if (isCalendarApplied) {
         if (periodMode === "Day") {
           if (t.date !== selectedDate) return false;
         } else {
@@ -232,11 +229,11 @@ export default function FullTransactionScreen() {
 
       return true;
     });
-  }, [transactions, filters, isCalendarApplied, periodMode, selectedDate, todayYMD]);
+  }, [transactions, filters, isCalendarApplied, periodMode, selectedDate]);
 
   // ── Card Period Label ─────────────────────────────────────────────────────
   const cardPeriodLabel = useMemo(() => {
-    if (!isCalendarApplied) return "Today";
+    if (!isCalendarApplied) return "All Time";
     if (periodMode === "Day") {
       if (selectedDate === todayYMD) return "Today";
       return formatDisplayDate(selectedDate);

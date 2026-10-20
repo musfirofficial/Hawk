@@ -90,3 +90,18 @@ export async function performGoogleSignOut(): Promise<void> {
   }
   await SecureStore.deleteItemAsync("google_id_token");
 }
+
+/**
+ * Retrieve Google OAuth access token for Google Drive API requests.
+ */
+export async function getGoogleAccessToken(): Promise<string | null> {
+  const GoogleSignin = getGoogleSigninModule();
+  if (!GoogleSignin) return null;
+  try {
+    const tokens = await GoogleSignin.getTokens();
+    return tokens.accessToken || null;
+  } catch (e) {
+    console.warn("Error fetching Google access token:", e);
+    return null;
+  }
+}

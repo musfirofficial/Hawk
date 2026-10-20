@@ -50,6 +50,7 @@ export interface CreateTransactionInput {
   contactId?: number | null;
   debtId?: number | null;
   date?: string;
+  createdAt?: string;
   dueDate?: string | null;
   note?: string | null;
 }
@@ -62,8 +63,15 @@ export interface UpdateTransactionInput {
   categoryId?: number | null;
   contactId?: number | null;
   date?: string;
+  createdAt?: string;
   dueDate?: string | null;
   note?: string | null;
+}
+
+export interface TodayStats {
+  income: number;
+  expense: number;
+  net: number;
 }
 
 interface TransactionsContextType {
@@ -72,6 +80,7 @@ interface TransactionsContextType {
   incomeCategories: CategoryItem[];
   expenseCategories: CategoryItem[];
   todayNetChange: number;
+  todayStats: TodayStats;
   isLoading: boolean;
   refreshTransactions: () => void;
   createTransaction: (data: CreateTransactionInput) => Promise<number>;
@@ -149,7 +158,7 @@ export function TransactionsProvider({
         LEFT JOIN liquid_assets ta ON ta.id = t.to_asset_id
         LEFT JOIN categories cat ON cat.id = t.category_id
         LEFT JOIN contacts c ON c.id = t.contact_id
-        ORDER BY t.date DESC, t.created_at DESC;
+        ORDER BY t.date DESC, t.created_at DESC, t.id DESC;
       `);
 
       const mapped: TransactionItem[] = txRows.map((row) => ({
@@ -218,8 +227,8 @@ export function TransactionsProvider({
           date: dateString,
           dueDate: data.dueDate?.trim() || null,
           note: data.note?.trim() || null,
-          createdAt: now,
-          updatedAt: now,
+          createdAt: data.createdAt || now,
+          updatedAt: data.createdAt || now,
         })
         .returning({ id: schema.transactions.id })
         .get();
@@ -246,6 +255,7 @@ export function TransactionsProvider({
       if (data.categoryId !== undefined) updateValues.categoryId = data.categoryId;
       if (data.contactId !== undefined) updateValues.contactId = data.contactId;
       if (data.date !== undefined) updateValues.date = data.date;
+      if (data.createdAt !== undefined) updateValues.createdAt = data.createdAt;
       if (data.dueDate !== undefined) updateValues.dueDate = data.dueDate?.trim() || null;
       if (data.note !== undefined) updateValues.note = data.note?.trim() || null;
 
@@ -335,20 +345,34 @@ export function TransactionsProvider({
     [categories]
   );
 
-  const todayNetChange = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
-    let net = 0;
+  const todayStats = useMemo(() => {
+    const d = new Date();
+    const todayYMD = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+
     for (const t of transactions) {
-      if (t.date === today) {
-        if (t.type === "INCOME" || t.type === "BORROW" || t.type === "DEBT RECEIVED") {
-          net += t.amount;
-        } else if (t.type === "EXPENSE" || t.type === "LEND" || t.type === "DEBT PAID") {
-          net -= t.amount;
+      const isToday =
+        t.date === todayYMD ||
+        (typeof t.date === "string" && t.date.startsWith(todayYMD));
+      if (isToday) {
+        if (t.type === "INCOME") {
+          totalIncome += t.amount;
+        } else if (t.type === "EXPENSE") {
+          totalExpense += t.amount;
         }
       }
     }
-    return net;
+
+    return {
+      income: totalIncome,
+      expense: totalExpense,
+      net: totalIncome - totalExpense,
+    };
   }, [transactions]);
+
+  const todayNetChange = todayStats.net;
 
   return (
     <TransactionsContext.Provider
@@ -358,6 +382,7 @@ export function TransactionsProvider({
         incomeCategories,
         expenseCategories,
         todayNetChange,
+        todayStats,
         isLoading,
         refreshTransactions: loadData,
         createTransaction,

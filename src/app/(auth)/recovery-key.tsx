@@ -21,7 +21,11 @@ import {
 export default function RecoveryKeyScreen() {
   const router = useRouter();
   const { settings, updateSecuritySettings } = useAuth();
-  const params = useLocalSearchParams<{ recoveryKey?: string }>();
+  const params = useLocalSearchParams<{
+    recoveryKey?: string;
+    origin?: "onboard" | "startup" | "settings";
+  }>();
+  const origin = params.origin || "onboard";
 
   const recoveryCode =
     params.recoveryKey || settings?.recoveryKey || "HWK-RECOVERY";
@@ -34,17 +38,25 @@ export default function RecoveryKeyScreen() {
   });
   const [enablingBio, setEnablingBio] = useState(false);
 
-  // Handle Option A: Hardware back press routes straight to Home
+  function handleComplete() {
+    if (origin === "startup") {
+      router.replace("/" as any);
+    } else {
+      router.replace("/(tabs)");
+    }
+  }
+
+  // Handle Hardware back press dynamically based on origin
   useEffect(() => {
     const backHandler = BackHandler.addEventListener(
       "hardwareBackPress",
       () => {
-        router.replace("/(tabs)");
+        handleComplete();
         return true;
       }
     );
     return () => backHandler.remove();
-  }, [router]);
+  }, [origin]);
 
   useEffect(() => {
     async function checkBio() {
@@ -70,7 +82,7 @@ export default function RecoveryKeyScreen() {
       );
       if (res.success) {
         await updateSecuritySettings({ biometricsEnabled: true });
-        router.replace("/(tabs)");
+        handleComplete();
       }
     } catch (err) {
       console.warn("Failed to enable biometrics:", err);
@@ -176,7 +188,7 @@ export default function RecoveryKeyScreen() {
 
               {/* Secondary Link: Set up later */}
               <TouchableOpacity
-                onPress={() => router.replace("/(tabs)")}
+                onPress={handleComplete}
                 className="py-3 items-center mt-1"
                 activeOpacity={0.7}
               >
@@ -187,12 +199,12 @@ export default function RecoveryKeyScreen() {
             </>
           ) : (
             <TouchableOpacity
-              onPress={() => router.replace("/(tabs)")}
+              onPress={handleComplete}
               className="w-full py-4 rounded-full bg-brand-accent items-center justify-center shadow-lg active:opacity-90"
               activeOpacity={0.8}
             >
               <Text className="text-dark-bg font-bold text-base">
-                Continue to Hawk
+                {origin === "startup" ? "Continue to Unlock" : "Continue to Hawk"}
               </Text>
             </TouchableOpacity>
           )}
