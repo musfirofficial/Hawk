@@ -9,7 +9,7 @@ import {
   Vibration,
   View,
 } from "react-native";
-import { useAuth } from "../context/auth";
+import { formatLockoutRemaining, useAuth } from "../context/auth";
 import {
   authenticateWithBiometrics,
   getBiometricCapability,
@@ -31,10 +31,18 @@ export function SecurityGuardModal({
   onSuccess,
   onCancel,
 }: SecurityGuardModalProps) {
-  const { settings, verifyPin, hasPin } = useAuth();
+  const {
+    settings,
+    verifyPin,
+    hasPin,
+    getPinLockoutSeconds,
+    recordFailedPinAttempt,
+    resetPinAttempts,
+  } = useAuth();
   const [viewMode, setViewMode] = useState<"BIOMETRIC" | "PIN">("PIN");
   const [enteredPin, setEnteredPin] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [pinLockoutSeconds, setPinLockoutSeconds] = useState(0);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState<
     "FINGERPRINT" | "FACE_ID" | "TOUCH_ID" | null
@@ -42,6 +50,32 @@ export function SecurityGuardModal({
   const [biometricLabel, setBiometricLabel] = useState("Biometrics");
 
   const pinInputRef = useRef<TextInput>(null);
+
+  // Check initial lockout state when modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      const remaining = getPinLockoutSeconds();
+      if (remaining > 0) {
+        setPinLockoutSeconds(remaining);
+      }
+    }
+  }, [visible, getPinLockoutSeconds]);
+
+  // Lockout countdown timer
+  useEffect(() => {
+    if (pinLockoutSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setPinLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setErrorMsg(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [pinLockoutSeconds]);
 
   // Check biometric capability when modal opens
   useEffect(() => {
@@ -118,6 +152,7 @@ export function SecurityGuardModal({
   }
 
   function handlePinChange(text: string) {
+    if (pinLockoutSeconds > 0) return;
     const cleaned = text.replace(/[^0-9]/g, "").slice(0, 4);
     setEnteredPin(cleaned);
     setErrorMsg(null);
@@ -134,6 +169,7 @@ export function SecurityGuardModal({
 
         const isValid = await verifyPin(cleaned);
         if (isValid) {
+          await resetPinAttempts();
           setTimeout(() => {
             onSuccess();
           }, 100);
@@ -141,7 +177,13 @@ export function SecurityGuardModal({
           if (Platform.OS !== "web") {
             Vibration.vibrate(100);
           }
-          setErrorMsg("Incorrect PIN. Please try again.");
+          const res = await recordFailedPinAttempt();
+          if (res.lockedOut) {
+            setPinLockoutSeconds(res.remainingSeconds);
+            setErrorMsg(null);
+          } else {
+            setErrorMsg("Incorrect PIN. Please try again.");
+          }
           setTimeout(() => {
             setEnteredPin("");
           }, 350);
@@ -262,6 +304,7 @@ export function SecurityGuardModal({
                 ref={pinInputRef}
                 value={enteredPin}
                 onChangeText={handlePinChange}
+                editable={pinLockoutSeconds === 0}
                 keyboardType="number-pad"
                 maxLength={4}
                 autoFocus={true}
@@ -274,8 +317,12 @@ export function SecurityGuardModal({
                 }}
               />
 
-              {/* Error Message */}
-              {errorMsg ? (
+              {/* Error or Lockout Message */}
+              {pinLockoutSeconds > 0 ? (
+                <Text className="text-brand-expense text-xs font-semibold text-center mb-4">
+                  Too many attempts. Try again in {formatLockoutRemaining(pinLockoutSeconds)}
+                </Text>
+              ) : errorMsg ? (
                 <Text className="text-brand-expense text-xs font-semibold text-center mb-4">
                   {errorMsg}
                 </Text>

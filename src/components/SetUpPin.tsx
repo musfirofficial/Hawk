@@ -16,9 +16,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "../context/auth";
-import { BiometricAuthType } from "../services/biometrics";
 import { HawkModal } from "./HawkModal";
+import { formatLockoutRemaining, useAuth } from "../context/auth";
+import { BiometricAuthType } from "../services/biometrics";
 import { SafeTouchable } from "./common/SafeTouchable";
 
 export interface SetUpPinHandle {
@@ -135,6 +135,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
         setPinLockoutSeconds((prev) => {
           if (prev <= 1) {
             clearInterval(interval);
+            setErrorMsg(null);
             return 0;
           }
           return prev - 1;
@@ -150,6 +151,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
         setRecoveryLockoutSeconds((prev) => {
           if (prev <= 1) {
             clearInterval(interval);
+            setResetError(null);
             return 0;
           }
           return prev - 1;
@@ -212,7 +214,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
         const res = await recordFailedRecoveryAttempt();
         if (res.lockedOut) {
           setRecoveryLockoutSeconds(res.remainingSeconds);
-          setResetError(`Too many attempts. Try again in ${res.remainingSeconds}s`);
+          setResetError(null);
         } else {
           setResetError("Incorrect recovery code. Please try again.");
         }
@@ -288,7 +290,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
                 const res = await recordFailedPinAttempt();
                 if (res.lockedOut) {
                   setPinLockoutSeconds(res.remainingSeconds);
-                  setErrorMsg(`Too many attempts. Try again in ${res.remainingSeconds}s`);
+                  setErrorMsg(null);
                 } else {
                   setErrorMsg("Incorrect PIN. Please try again.");
                 }
@@ -321,7 +323,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
               const res = await recordFailedPinAttempt();
               if (res.lockedOut) {
                 setPinLockoutSeconds(res.remainingSeconds);
-                setErrorMsg(`Too many attempts. Try again in ${res.remainingSeconds}s`);
+                setErrorMsg(null);
               } else {
                 setErrorMsg("Incorrect current PIN. Please try again.");
               }
@@ -471,7 +473,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
 
           {pinLockoutSeconds > 0 ? (
             <Text className="text-brand-expense text-xs font-semibold text-center mt-2">
-              Too many attempts. Try again in {pinLockoutSeconds}s
+              Too many attempts. Try again in {formatLockoutRemaining(pinLockoutSeconds)}
             </Text>
           ) : errorMsg ? (
             <Text className="text-brand-expense text-xs font-semibold text-center mt-2">
@@ -654,6 +656,10 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
                     Recovery code verified! Redirecting...
                   </Text>
                 </View>
+              ) : recoveryLockoutSeconds > 0 ? (
+                <Text className="text-brand-expense text-xs font-semibold text-center mb-4">
+                  Too many attempts. Try again in {formatLockoutRemaining(recoveryLockoutSeconds)}
+                </Text>
               ) : resetError ? (
                 <Text className="text-brand-expense text-xs font-semibold text-center mb-4">
                   {resetError}
@@ -693,7 +699,7 @@ export const SetUpPin = forwardRef<SetUpPinHandle, SetUpPinProps>(
                     }`}
                   >
                     {recoveryLockoutSeconds > 0
-                      ? `Locked Out (${recoveryLockoutSeconds}s)`
+                      ? `Locked Out (${formatLockoutRemaining(recoveryLockoutSeconds)})`
                       : "Verify Code"}
                   </Text>
                 </TouchableOpacity>

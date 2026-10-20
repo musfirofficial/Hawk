@@ -2,6 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { eq } from "drizzle-orm";
 import { db, expoDb } from "../db";
 import * as schema from "../db/schema";
+import { getGoogleAccessToken } from "./googleAuth";
 
 export interface DriveBackupMetadata {
   id: string;
@@ -52,20 +53,36 @@ export async function getLocalDatabaseSize(): Promise<number> {
 
 /**
  * Fetch existing Hawk backup file metadata from Google Drive appDataFolder.
+ * Automatically attempts token refresh and retries once if a 401 is encountered.
  */
 export async function fetchCloudBackupMetadata(
   accessToken: string
 ): Promise<DriveBackupMetadata | null> {
-  try {
-    const url =
-      "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='hawk_backup.db' and trashed=false&fields=files(id,name,size,modifiedTime)";
+  const url =
+    "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='hawk_backup.db' and trashed=false&fields=files(id,name,size,modifiedTime)";
 
-    const res = await fetch(url, {
+  try {
+    let token = accessToken;
+    let res = await fetch(url, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
       },
     });
+
+    if (res.status === 401) {
+      console.warn("Google Drive returned 401 on metadata fetch. Attempting token refresh...");
+      const freshToken = await getGoogleAccessToken(true);
+      if (freshToken) {
+        token = freshToken;
+        res = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+    }
 
     if (!res.ok) {
       console.warn("Google Drive list files response error:", res.status);
@@ -91,11 +108,13 @@ export async function fetchCloudBackupMetadata(
 
 /**
  * Create a clean SQLite snapshot and upload it to Google Drive appDataFolder.
+ * Automatically refreshes token on 401.
  */
 export async function performBackupToDrive(
   accessToken: string
 ): Promise<DriveBackupMetadata> {
   const snapshotPath = `${FileSystem.cacheDirectory}hawk_snapshot.db`;
+  let token = accessToken;
 
   try {
     // 1. Create a clean vacuumed snapshot
@@ -104,18 +123,18 @@ export async function performBackupToDrive(
 
     // 2. Check if a backup file already exists on Drive
     let fileId: string | null = null;
-    const existing = await fetchCloudBackupMetadata(accessToken);
+    const existing = await fetchCloudBackupMetadata(token);
 
     if (existing) {
       fileId = existing.id;
     } else {
       // Create new file metadata entry in appDataFolder
-      const createRes = await fetch(
+      let createRes = await fetch(
         "https://www.googleapis.com/drive/v3/files",
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -124,6 +143,28 @@ export async function performBackupToDrive(
           }),
         }
       );
+
+      if (createRes.status === 401) {
+        console.warn("Google Drive returned 401 on file init. Attempting token refresh...");
+        const freshToken = await getGoogleAccessToken(true);
+        if (freshToken) {
+          token = freshToken;
+          createRes = await fetch(
+            "https://www.googleapis.com/drive/v3/files",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                name: "hawk_backup.db",
+                parents: ["appDataFolder"],
+              }),
+            }
+          );
+        }
+      }
 
       if (!createRes.ok) {
         throw new Error(
@@ -140,14 +181,30 @@ export async function performBackupToDrive(
 
     // 3. Upload database file contents
     const uploadUrl = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`;
-    const uploadResult = await FileSystem.uploadAsync(uploadUrl, snapshotPath, {
+    let uploadResult = await FileSystem.uploadAsync(uploadUrl, snapshotPath, {
       httpMethod: "PATCH",
       uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/x-sqlite3",
       },
     });
+
+    if (uploadResult.status === 401) {
+      console.warn("Google Drive returned 401 on upload. Attempting token refresh...");
+      const freshToken = await getGoogleAccessToken(true);
+      if (freshToken) {
+        token = freshToken;
+        uploadResult = await FileSystem.uploadAsync(uploadUrl, snapshotPath, {
+          httpMethod: "PATCH",
+          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/x-sqlite3",
+          },
+        });
+      }
+    }
 
     if (uploadResult.status < 200 || uploadResult.status >= 300) {
       throw new Error(
@@ -166,7 +223,7 @@ export async function performBackupToDrive(
       .run();
 
     // 5. Fetch updated metadata to return
-    const updatedMeta = await fetchCloudBackupMetadata(accessToken);
+    const updatedMeta = await fetchCloudBackupMetadata(token);
     return (
       updatedMeta || {
         id: fileId,
@@ -182,27 +239,46 @@ export async function performBackupToDrive(
 
 /**
  * Download backup from Google Drive and atomically restore tables into local database.
+ * Automatically refreshes token on 401.
  */
 export async function performRestoreFromDrive(
   accessToken: string,
   fileId: string
 ): Promise<void> {
   const tempPath = `${FileSystem.cacheDirectory}hawk_restore_temp.db`;
+  let token = accessToken;
 
   try {
     await FileSystem.deleteAsync(tempPath, { idempotent: true });
 
     // 1. Download file from Google Drive
     const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-    const downloadResult = await FileSystem.downloadAsync(
+    let downloadResult = await FileSystem.downloadAsync(
       downloadUrl,
       tempPath,
       {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${token}`,
         },
       }
     );
+
+    if (downloadResult.status === 401) {
+      console.warn("Google Drive returned 401 on download. Attempting token refresh...");
+      const freshToken = await getGoogleAccessToken(true);
+      if (freshToken) {
+        token = freshToken;
+        downloadResult = await FileSystem.downloadAsync(
+          downloadUrl,
+          tempPath,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+      }
+    }
 
     if (downloadResult.status < 200 || downloadResult.status >= 300) {
       throw new Error(
@@ -261,22 +337,42 @@ export async function performRestoreFromDrive(
 
 /**
  * Delete backup file from Google Drive appDataFolder.
+ * Automatically refreshes token on 401.
  */
 export async function deleteCloudBackup(
   accessToken: string,
   fileId: string
 ): Promise<void> {
-  const res = await fetch(
+  let token = accessToken;
+  let res = await fetch(
     `https://www.googleapis.com/drive/v3/files/${fileId}`,
     {
       method: "DELETE",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
       },
     }
   );
+
+  if (res.status === 401) {
+    console.warn("Google Drive returned 401 on delete. Attempting token refresh...");
+    const freshToken = await getGoogleAccessToken(true);
+    if (freshToken) {
+      token = freshToken;
+      res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+    }
+  }
 
   if (!res.ok && res.status !== 404) {
     throw new Error(`Failed to delete cloud backup (Status ${res.status})`);
   }
 }
+

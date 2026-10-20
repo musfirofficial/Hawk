@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeRouter } from "../../hooks/useSafeRouter";
 import { useMemo, useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8,6 +7,7 @@ import { TransactionCard } from "../../components/transactions/TransactionCard";
 import { useAccounts } from "../../context/accounts";
 import { useAuth } from "../../context/auth";
 import { useTransactions } from "../../context/transactions";
+import { useSafeRouter } from "../../hooks/useSafeRouter";
 import { formatCurrency } from "../../services/currency";
 
 export default function HomeScreen() {
@@ -17,7 +17,7 @@ export default function HomeScreen() {
     useAccounts();
   const { transactions, todayNetChange } = useTransactions();
 
-  const [showBalance, setShowBalance] = useState(true);
+  const [showBalance, setShowBalance] = useState(false);
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
 
   // Calculate Bank and Cash percentages
@@ -313,7 +313,7 @@ export default function HomeScreen() {
                   onPress={() => {
                     if (tx.debtId) {
                       router.push(
-                        `/createdebt?debtId=${tx.debtId}&txId=${tx.id}&mode=preview&from=transactions` as any
+                        `/createdebt?debtId=${tx.debtId}&txId=${tx.id}&mode=preview&from=transactions` as any,
                       );
                     } else {
                       router.push(`/(transaction)/${tx.id}` as any);

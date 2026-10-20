@@ -450,8 +450,6 @@ S5: No AppState re-lock on app resume
 S6: Recovery key reset has no rate limiting
 S1/S2: PIN + recovery key stored in plaintext (see decision below)
 
-git commit -m "Fix:Restore not in SQL transaction (data loss risk),Contacts uses stale is_settled columns → debt sums always 0,settledAt: undefined never clears the DB column, deleteTransaction redundant/wrong cascade order, eleteDebt three separate deletes with no atomic wrapper, SQL injection via unquoted table names in restore, No AppState re-lock on app resume, Recovery key reset has no rate limiting, PIN + recovery key stored in plaintext (see decision below)"
-
 Group 3 — PIN & Lockout System
 B6: PIN lockout counter never resets after the 30s expires
 S3: Google access token has no refresh — silent 401 backup failures

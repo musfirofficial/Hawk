@@ -88,6 +88,54 @@ interface AuthContextType {
   reloadSettings: () => void;
 }
 
+/**
+ * Calculates progressive lockout duration based on consecutive failure sets of 5:
+ * - 5 attempts: 30s
+ * - 10 attempts: 2m (120s)
+ * - 15 attempts: 5m (300s)
+ * - 20 attempts: 10m (600s)
+ * - 25 attempts: 30m (1800s)
+ * - 30+ attempts: 2h (7200s)
+ */
+export function getLockoutDurationSeconds(failedAttempts: number): number {
+  const setIndex = Math.floor(failedAttempts / 5);
+  switch (setIndex) {
+    case 0:
+      return 0;
+    case 1:
+      return 30; // 30s
+    case 2:
+      return 120; // 2m
+    case 3:
+      return 300; // 5m
+    case 4:
+      return 600; // 10m
+    case 5:
+      return 1800; // 30m
+    default:
+      return 7200; // 2h
+  }
+}
+
+/**
+ * Format remaining lockout seconds into user-friendly text:
+ * e.g., "30s", "2m", "1m 45s", "10m", "30m", "2h", "1h 50m"
+ */
+export function formatLockoutRemaining(seconds: number): string {
+  if (seconds <= 0) return "0s";
+  if (seconds >= 3600) {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  }
+  if (seconds >= 60) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+  }
+  return `${seconds}s`;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -431,15 +479,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const now = Date.now();
       const previousLockout = Number(existing[0].lockoutUntil);
-      let currentAttempts = existing[0].failedRecoveryAttempts || 0;
-      // Reset attempts if lockout period already passed
-      if (previousLockout && now > previousLockout) {
-        currentAttempts = 0;
+      // If currently locked out, do not count attempt and return remaining seconds
+      if (previousLockout && now < previousLockout) {
+        const remaining = Math.ceil((previousLockout - now) / 1000);
+        return { lockedOut: true, remainingSeconds: remaining };
       }
-      currentAttempts += 1;
 
-      if (currentAttempts >= 5) {
-        const lockoutEpoch = now + 30 * 1000; // 30-second lockout
+      const currentAttempts = (existing[0].failedRecoveryAttempts || 0) + 1;
+
+      // Lockout triggers on every multiple of 5 failed attempts
+      if (currentAttempts % 5 === 0) {
+        const duration = getLockoutDurationSeconds(currentAttempts);
+        const lockoutEpoch = now + duration * 1000;
         db.update(schema.appSettings)
           .set({
             failedRecoveryAttempts: currentAttempts,
@@ -449,11 +500,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .where(eq(schema.appSettings.id, existing[0].id))
           .run();
         await loadSettingsFromDB();
-        return { lockedOut: true, remainingSeconds: 30 };
+        return { lockedOut: true, remainingSeconds: duration };
       } else {
         db.update(schema.appSettings)
           .set({
             failedRecoveryAttempts: currentAttempts,
+            lockoutUntil: null,
             updatedAt: new Date().toISOString(),
           })
           .where(eq(schema.appSettings.id, existing[0].id))
@@ -507,15 +559,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const now = Date.now();
       const previousLockout = Number(existing[0].pinLockoutUntil);
-      let currentAttempts = existing[0].failedPinAttempts || 0;
-      // Reset attempts if lockout period already passed
-      if (previousLockout && now > previousLockout) {
-        currentAttempts = 0;
+      // If currently locked out, do not count attempt and return remaining seconds
+      if (previousLockout && now < previousLockout) {
+        const remaining = Math.ceil((previousLockout - now) / 1000);
+        return { lockedOut: true, remainingSeconds: remaining };
       }
-      currentAttempts += 1;
 
-      if (currentAttempts >= 5) {
-        const lockoutEpoch = now + 30 * 1000; // 30-second lockout
+      const currentAttempts = (existing[0].failedPinAttempts || 0) + 1;
+
+      // Lockout triggers on every multiple of 5 failed attempts
+      if (currentAttempts % 5 === 0) {
+        const duration = getLockoutDurationSeconds(currentAttempts);
+        const lockoutEpoch = now + duration * 1000;
         db.update(schema.appSettings)
           .set({
             failedPinAttempts: currentAttempts,
@@ -525,11 +580,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .where(eq(schema.appSettings.id, existing[0].id))
           .run();
         await loadSettingsFromDB();
-        return { lockedOut: true, remainingSeconds: 30 };
+        return { lockedOut: true, remainingSeconds: duration };
       } else {
         db.update(schema.appSettings)
           .set({
             failedPinAttempts: currentAttempts,
+            pinLockoutUntil: null,
             updatedAt: new Date().toISOString(),
           })
           .where(eq(schema.appSettings.id, existing[0].id))

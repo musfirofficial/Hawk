@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "../../context/auth";
+import { formatLockoutRemaining, useAuth } from "../../context/auth";
 import { useSafeRouter } from "../../hooks/useSafeRouter";
 
 export default function VerifyCodeScreen() {
@@ -51,6 +51,7 @@ export default function VerifyCodeScreen() {
       setLockoutSeconds((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
+          setErrorMsg(null);
           return 0;
         }
         return prev - 1;
@@ -130,7 +131,7 @@ export default function VerifyCodeScreen() {
       setIsVerifying(false);
       if (res.lockedOut) {
         setLockoutSeconds(res.remainingSeconds);
-        setErrorMsg(`Too many attempts. Try again in ${res.remainingSeconds}s`);
+        setErrorMsg(null);
       } else {
         setErrorMsg("Incorrect verification code");
       }
@@ -192,7 +193,7 @@ export default function VerifyCodeScreen() {
             {/* Error or Lockout Message */}
             {lockoutSeconds > 0 ? (
               <Text className="text-brand-expense text-sm font-semibold text-center mt-3">
-                Too many attempts. Try again in {lockoutSeconds}s
+                Too many attempts. Try again in {formatLockoutRemaining(lockoutSeconds)}
               </Text>
             ) : errorMsg ? (
               <Text className="text-brand-expense text-sm font-semibold text-center mt-3">

@@ -93,15 +93,43 @@ export async function performGoogleSignOut(): Promise<void> {
 
 /**
  * Retrieve Google OAuth access token for Google Drive API requests.
+ * If forceRefresh is true, clears cached token and silently refreshes via Google Play Services.
  */
-export async function getGoogleAccessToken(): Promise<string | null> {
+export async function getGoogleAccessToken(
+  forceRefresh = false,
+): Promise<string | null> {
   const GoogleSignin = getGoogleSigninModule();
   if (!GoogleSignin) return null;
   try {
-    const tokens = await GoogleSignin.getTokens();
-    return tokens.accessToken || null;
+    if (forceRefresh) {
+      try {
+        const currentTokens = await GoogleSignin.getTokens();
+        if (currentTokens?.accessToken) {
+          await GoogleSignin.clearCachedAccessToken(currentTokens.accessToken);
+        }
+      } catch (clearErr) {
+        console.warn("Error clearing cached Google access token:", clearErr);
+      }
+      try {
+        await GoogleSignin.signInSilently();
+      } catch (silentErr) {
+        console.warn("Silent sign-in failed during token refresh:", silentErr);
+      }
+    }
+
+    let tokens = await GoogleSignin.getTokens();
+    if (!tokens?.accessToken) {
+      try {
+        await GoogleSignin.signInSilently();
+        tokens = await GoogleSignin.getTokens();
+      } catch (silentErr) {
+        console.warn("Silent sign-in fallback failed:", silentErr);
+      }
+    }
+    return tokens?.accessToken || null;
   } catch (e) {
     console.warn("Error fetching Google access token:", e);
     return null;
   }
 }
+
