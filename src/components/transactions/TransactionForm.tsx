@@ -76,12 +76,6 @@ export function TransactionForm({
   const { settings } = useAuth();
   const { showConfirm, showAlert } = useAlert();
 
-  // Check if current transaction is the very latest entry (only the latest can be deleted)
-  const isLatestTransaction = useMemo(() => {
-    if (!initialData || transactions.length === 0) return false;
-    return transactions[0]?.id === initialData.id;
-  }, [transactions, initialData]);
-
   // Core Form State
   const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER">(
     initialData
@@ -119,6 +113,7 @@ export function TransactionForm({
   const [isAccountSheetOpen, setIsAccountSheetOpen] = useState(false);
   const [accountTarget, setAccountTarget] = useState<"from" | "to">("from");
   const [accountTypeTab, setAccountTypeTab] = useState<LiquidAssetType>("BANK");
+  const [tempAssetId, setTempAssetId] = useState<number | null>(null);
 
   const [isCategorySheetOpen, setIsCategorySheetOpen] = useState(false);
   const [tempCategoryId, setTempCategoryId] = useState<number | null>(null);
@@ -238,18 +233,31 @@ export function TransactionForm({
       return;
     }
     setAccountTarget(target);
+    const currentSelected =
+      target === "from"
+        ? type === "INCOME"
+          ? toAssetId
+          : fromAssetId
+        : toAssetId;
+    setTempAssetId(currentSelected ?? null);
     setIsAccountSheetOpen(true);
   };
 
   const handleSelectAccount = (accId: number) => {
-    if (accountTarget === "from") {
-      if (type === "INCOME") {
-        setToAssetId(accId);
+    setTempAssetId(accId);
+  };
+
+  const handleConfirmAccount = () => {
+    if (tempAssetId) {
+      if (accountTarget === "from") {
+        if (type === "INCOME") {
+          setToAssetId(tempAssetId);
+        } else {
+          setFromAssetId(tempAssetId);
+        }
       } else {
-        setFromAssetId(accId);
+        setToAssetId(tempAssetId);
       }
-    } else {
-      setToAssetId(accId);
     }
     setIsAccountSheetOpen(false);
   };
@@ -809,8 +817,8 @@ export function TransactionForm({
           <View className="h-28" />
         </ScrollView>
 
-        {/* Action Button at Bottom: Only render if create mode, edit mode, or if viewing the latest transaction */}
-        {mode === "create" || isEditing || isLatestTransaction ? (
+        {/* Action Button at Bottom: Render if create mode, edit mode, or preview mode */}
+        {mode === "create" || isEditing || initialData ? (
           <View className="px-5 pb-5 pt-3 bg-dark-bg/95 border-t border-dark-border/40">
             {mode === "create" ? (
               <SlideButton
@@ -833,7 +841,7 @@ export function TransactionForm({
                   </Text>
                 )}
               </TouchableOpacity>
-            ) : isLatestTransaction ? (
+            ) : initialData ? (
               <TouchableOpacity
                 onPress={handleDelete}
                 disabled={isDeleting}
@@ -949,90 +957,102 @@ export function TransactionForm({
             </TouchableOpacity>
           </View>
         ) : (
-          <ScrollView
-            className="max-h-[300px]"
-            showsVerticalScrollIndicator={false}
-          >
-            {accounts
-              .filter((a) => a.assetType === accountTypeTab)
-              .map((acc) => {
-                const isSelected =
-                  accountTarget === "from"
-                    ? fromAssetId === acc.id
-                    : toAssetId === acc.id;
+          <>
+            <ScrollView
+              className="max-h-[300px]"
+              showsVerticalScrollIndicator={false}
+            >
+              {accounts
+                .filter((a) => a.assetType === accountTypeTab)
+                .map((acc) => {
+                  const isSelected = tempAssetId === acc.id;
 
-                const isAlreadySource =
-                  accountTarget === "to" && acc.id === fromAssetId;
+                  const isAlreadySource =
+                    accountTarget === "to" && acc.id === fromAssetId;
 
-                const isInsufficient =
-                  accountTarget === "from" &&
-                  type !== "INCOME" &&
-                  (acc.currentBalance ?? 0) < parsedAmount;
+                  const isInsufficient =
+                    accountTarget === "from" &&
+                    type !== "INCOME" &&
+                    (acc.currentBalance ?? 0) < parsedAmount;
 
-                const isDisabled = isAlreadySource || isInsufficient;
+                  const isDisabled = isAlreadySource || isInsufficient;
 
-                return (
-                  <TouchableOpacity
-                    key={acc.id}
-                    disabled={isDisabled}
-                    onPress={() => handleSelectAccount(acc.id)}
-                    activeOpacity={0.7}
-                    className={`flex-row items-center justify-between p-3.5 rounded-2xl mb-2 border ${
-                      isSelected
-                        ? "bg-brand-accent/10 border-brand-accent"
-                        : "bg-dark-card/50 border-dark-border"
-                    } ${isDisabled ? "opacity-35" : ""}`}
-                  >
-                    <View className="flex-row items-center gap-3">
-                      <View className="w-10 h-10 rounded-xl bg-dark-surface border border-dark-border items-center justify-center">
-                        <Ionicons
-                          name={
-                            acc.assetType === "BANK" ? "business" : "wallet"
-                          }
-                          size={18}
-                          color={isSelected ? "#D4F938" : "#94A3B8"}
-                        />
+                  return (
+                    <TouchableOpacity
+                      key={acc.id}
+                      disabled={isDisabled}
+                      onPress={() => handleSelectAccount(acc.id)}
+                      activeOpacity={0.7}
+                      className={`flex-row items-center justify-between p-3.5 rounded-2xl mb-2 border ${
+                        isSelected
+                          ? "bg-brand-accent/10 border-brand-accent"
+                          : "bg-dark-card/50 border-dark-border"
+                      } ${isDisabled ? "opacity-35" : ""}`}
+                    >
+                      <View className="flex-row items-center gap-3">
+                        <View className="w-10 h-10 rounded-xl bg-dark-surface border border-dark-border items-center justify-center">
+                          <Ionicons
+                            name={
+                              acc.assetType === "BANK" ? "business" : "wallet"
+                            }
+                            size={18}
+                            color={isSelected ? "#D4F938" : "#94A3B8"}
+                          />
+                        </View>
+                        <View>
+                          <Text
+                            className={`text-sm font-bold ${
+                              isSelected ? "text-brand-accent" : "text-dark-text"
+                            }`}
+                          >
+                            {acc.name}
+                          </Text>
+                          {acc.accountNumber ? (
+                            <Text className="text-dark-muted text-[11px]">
+                              {acc.accountNumber}
+                            </Text>
+                          ) : null}
+                        </View>
                       </View>
-                      <View>
+
+                      <View className="items-end">
                         <Text
                           className={`text-sm font-bold ${
-                            isSelected ? "text-brand-accent" : "text-dark-text"
+                            isDisabled && isInsufficient
+                              ? "text-rose-400"
+                              : "text-dark-text"
                           }`}
                         >
-                          {acc.name}
+                          {formatCurrency(
+                            acc.currentBalance ?? 0,
+                            settings?.currency,
+                            settings?.numberFormat,
+                          )}
                         </Text>
-                        {acc.accountNumber ? (
-                          <Text className="text-dark-muted text-[11px]">
-                            {acc.accountNumber}
+                        {isDisabled && isInsufficient ? (
+                          <Text className="text-rose-400 text-[10px]">
+                            Low balance
                           </Text>
                         ) : null}
                       </View>
-                    </View>
+                    </TouchableOpacity>
+                  );
+                })}
+            </ScrollView>
 
-                    <View className="items-end">
-                      <Text
-                        className={`text-sm font-bold ${
-                          isDisabled && isInsufficient
-                            ? "text-rose-400"
-                            : "text-dark-text"
-                        }`}
-                      >
-                        {formatCurrency(
-                          acc.currentBalance ?? 0,
-                          settings?.currency,
-                          settings?.numberFormat,
-                        )}
-                      </Text>
-                      {isDisabled && isInsufficient ? (
-                        <Text className="text-rose-400 text-[10px]">
-                          Low balance
-                        </Text>
-                      ) : null}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-          </ScrollView>
+            <View className="mt-4">
+              <TouchableOpacity
+                onPress={handleConfirmAccount}
+                disabled={!tempAssetId}
+                activeOpacity={0.8}
+                className={`w-full py-3.5 rounded-2xl items-center justify-center ${
+                  tempAssetId ? "bg-brand-accent" : "bg-dark-surface opacity-50"
+                }`}
+              >
+                <Text className="text-dark-bg font-bold text-base">Done</Text>
+              </TouchableOpacity>
+            </View>
+          </>
         )}
       </HawkFlyUp>
 

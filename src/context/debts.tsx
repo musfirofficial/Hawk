@@ -71,6 +71,8 @@ export interface UpdateDebtInput {
   type?: DebtType;
   amount?: number;
   assetId?: number | null;
+  date?: string;
+  time?: string;
   dueDate?: string | null;
   note?: string | null;
 }
@@ -341,12 +343,30 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
       if (data.dueDate !== undefined) updateValues.dueDate = data.dueDate?.trim() || null;
       if (data.note !== undefined) updateValues.note = data.note?.trim() || null;
 
+      let newCreatedAt: string | undefined = undefined;
+      if (data.date) {
+        if (data.time && data.time.includes(":")) {
+          const parts = data.time.trim().split(" ");
+          const hm = (parts[0] || "").split(":");
+          let h = parseInt(hm[0], 10);
+          const m = parseInt(hm[1], 10) || 0;
+          if (parts[1] === "PM" && h < 12) h += 12;
+          if (parts[1] === "AM" && h === 12) h = 0;
+          const hh = String(h).padStart(2, "0");
+          const mm = String(m).padStart(2, "0");
+          newCreatedAt = `${data.date}T${hh}:${mm}:00.000Z`;
+        } else {
+          newCreatedAt = `${data.date}T12:00:00.000Z`;
+        }
+        updateValues.createdAt = newCreatedAt;
+      }
+
       db.update(schema.debts)
         .set(updateValues)
         .where(eq(schema.debts.id, id))
         .run();
 
-      // Sync the initial loan transaction (amount, account, contact, dueDate, note)
+      // Sync the initial loan transaction (amount, account, contact, dueDate, note, date, createdAt)
       const initialTx = expoDb.getFirstSync<{ id: number; type: string }>(
         `SELECT id, type FROM transactions WHERE debt_id = ? AND (type = 'LEND' OR type = 'BORROW');`,
         [id]
@@ -360,6 +380,12 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
         if (data.dueDate !== undefined) txUpdate.dueDate = data.dueDate?.trim() || null;
         if (data.note !== undefined) txUpdate.note = data.note?.trim() || null;
         if (data.contactId !== undefined) txUpdate.contactId = data.contactId;
+        if (data.date) {
+          txUpdate.date = data.date;
+          if (newCreatedAt) {
+            txUpdate.createdAt = newCreatedAt;
+          }
+        }
 
         if (data.assetId !== undefined && data.assetId !== null) {
           const currentType = data.type || existingDebt?.type || initialTx.type;

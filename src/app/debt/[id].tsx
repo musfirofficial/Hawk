@@ -143,81 +143,141 @@ export default function DebtDetailScreen() {
     return Math.min(Math.max(pct, 0), 100);
   }, [debt]);
 
-  // Formatted Creation Date & Time
-  const createdDateTimeText = useMemo(() => {
-    if (!debt?.createdAt) return "";
+  // Formatted Creation Date & Time (Parts for header display)
+  const createdDateParts = useMemo(() => {
+    if (!debt?.createdAt) return { date: "", time: "" };
     try {
       const datePart = formatDisplayDate(debt.createdAt.split("T")[0]);
       const d = new Date(debt.createdAt);
-      if (isNaN(d.getTime())) return datePart;
+      if (isNaN(d.getTime())) return { date: datePart, time: "" };
       let hours = d.getHours();
       const minutes = d.getMinutes();
       const period = hours >= 12 ? "PM" : "AM";
       const hour12 = hours % 12 || 12;
       const h = String(hour12).padStart(2, "0");
       const m = String(minutes).padStart(2, "0");
-      return `${datePart}, ${h}:${m} ${period}`;
+      return {
+        date: datePart,
+        time: `${h}:${m} ${period}`,
+      };
     } catch {
-      return "";
+      return { date: "", time: "" };
     }
   }, [debt?.createdAt]);
 
-  // Due Date Status & Time Left
+  // Due Date Status & Time Left (Hour-based difference between debt created day and due date end hour)
   const dueDateInfo = useMemo(() => {
     if (!debt?.dueDate) return null;
     const today = getTodayYMD();
-    const isExpired = debt.dueDate < today;
+    const isPastDate = debt.dueDate < today;
 
-    const todayDate = new Date(today);
-    const targetDate = new Date(debt.dueDate);
-    const diffMs = targetDate.getTime() - todayDate.getTime();
-    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    // Due date end is next day 00:00:00 (user has time until end of due date day)
+    const dueParts = debt.dueDate.split("-").map((v) => parseInt(v, 10));
+    const dueEndDate = new Date(
+      dueParts[0],
+      dueParts[1] - 1,
+      dueParts[2] + 1,
+      0,
+      0,
+      0,
+      0,
+    );
+
+    let totalSpanHours = 24;
+    let elapsedHours = 0;
+    let timePercent = 0;
+
+    if (debt.createdAt) {
+      const createdRaw = new Date(debt.createdAt);
+      // Debt created hour (ignore minutes and seconds)
+      const startHourDate = !isNaN(createdRaw.getTime())
+        ? new Date(
+            createdRaw.getFullYear(),
+            createdRaw.getMonth(),
+            createdRaw.getDate(),
+            createdRaw.getHours(),
+            0,
+            0,
+            0,
+          )
+        : new Date(debt.createdAt.split("T")[0]);
+
+      totalSpanHours = Math.max(
+        1,
+        (dueEndDate.getTime() - startHourDate.getTime()) / (1000 * 60 * 60),
+      );
+
+      // If debt is settled/written off, freeze elapsed time at settlement
+      const isSettledOrWrittenOff = debt.state !== "ONGOING";
+      let evalDate = new Date();
+      if (isSettledOrWrittenOff) {
+        const settleRaw = debt.settledAt || debt.updatedAt;
+        if (settleRaw) {
+          const s = new Date(settleRaw);
+          if (!isNaN(s.getTime())) evalDate = s;
+        }
+      }
+
+      elapsedHours = Math.max(
+        0,
+        (evalDate.getTime() - startHourDate.getTime()) / (1000 * 60 * 60),
+      );
+      timePercent = (elapsedHours / totalSpanHours) * 100;
+    } else {
+      timePercent = isPastDate ? 100 : 0;
+    }
+
+    const isOverdue = timePercent >= 100 || isPastDate;
+    const clampedBarPercent = Math.min(100, Math.max(0, timePercent));
+
+    const now = new Date();
+    const diffHoursTotal = Math.round(
+      (dueEndDate.getTime() - now.getTime()) / (1000 * 60 * 60),
+    );
+    const diffDays = Math.ceil(diffHoursTotal / 24);
 
     let text = "";
-    if (isExpired) {
-      const daysAgo = Math.abs(diffDays);
+    if (isOverdue) {
+      const daysAgo = Math.max(1, Math.abs(diffDays));
       text =
-        daysAgo === 0
-          ? "Due today (Expired)"
+        daysAgo <= 1
+          ? "Overdue today"
           : `Overdue by ${daysAgo} day${daysAgo > 1 ? "s" : ""}`;
-    } else if (diffDays === 0) {
+    } else if (diffDays <= 1) {
       text = "Due today";
     } else {
       text = `${diffDays} day${diffDays > 1 ? "s" : ""} left`;
     }
 
-    // Time progress percent (between due date and debt created day)
-    let timePercent = 0;
-    if (debt.createdAt) {
-      const createdDate = new Date(debt.createdAt.split("T")[0]);
-      const totalSpan = targetDate.getTime() - createdDate.getTime();
+    // Colors:
+    // below 75% -> green
+    // >= 75% && < 100% -> orange
+    // >= 100% or overdue -> red
+    let barColor = "bg-emerald-500";
+    let textColor = "text-emerald-400";
+    let iconColor = "#10B981";
 
-      // If debt is settled/written off, record progress up to settlement date
-      const isSettledOrWrittenOff = debt.state !== "ONGOING";
-      const endEffectiveDate = isSettledOrWrittenOff
-        ? debt.settledAt
-          ? new Date(debt.settledAt.split("T")[0])
-          : new Date(debt.updatedAt.split("T")[0])
-        : todayDate;
-
-      const elapsedSpan = endEffectiveDate.getTime() - createdDate.getTime();
-      if (totalSpan > 0) {
-        timePercent = Math.min(
-          100,
-          Math.max(0, Math.round((elapsedSpan / totalSpan) * 100)),
-        );
-      } else {
-        timePercent = isExpired ? 100 : 0;
-      }
+    if (isOverdue) {
+      barColor = "bg-rose-500";
+      textColor = "text-rose-400";
+      iconColor = "#F43F5E";
+    } else if (timePercent >= 75) {
+      barColor = "bg-amber-500";
+      textColor = "text-amber-400";
+      iconColor = "#F59E0B";
     }
 
     return {
       dueDate: debt.dueDate,
       formattedDate: formatDisplayDate(debt.dueDate),
-      isExpired,
+      isExpired: isOverdue,
       diffDays,
       text,
       timePercent,
+      clampedBarPercent,
+      barColor,
+      textColor,
+      iconColor,
     };
   }, [debt]);
 
@@ -437,6 +497,7 @@ export default function DebtDetailScreen() {
         {/* 2. Top Header Section */}
         <View className="mb-6">
           {/* Avatar on left side + Name and monochrome pencil on right */}
+          {/* Avatar on left side + Name and Date/Time top right, Edit button below */}
           <View className="flex-row items-center mb-4">
             <ContactAvatar
               name={debt.contactName}
@@ -451,25 +512,21 @@ export default function DebtDetailScreen() {
                 >
                   {debt.contactName}
                 </Text>
-                {isOngoing && (
-                  <TouchableOpacity
-                    onPress={() =>
-                      safePush(`/createdebt?debtId=${debt.id}&mode=edit`)
-                    }
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    className="w-8 h-8 rounded-full bg-dark-surface border border-dark-border items-center justify-center active:bg-dark-card"
-                  >
-                    <Ionicons name="pencil" size={14} color="#F8FAFC" />
-                  </TouchableOpacity>
-                )}
-              </View>
 
-              {/* Text with NO badges showing Borrowed/Deposit fro/to account name */}
-              <Text className="text-dark-muted text-xs font-medium mt-1 font-sans">
-                {isLend
-                  ? `Lent · Paid from ${initialAccountName || "Account"}`
-                  : `Borrowed · Deposit to ${initialAccountName || "Account"}`}
-              </Text>
+                {/* Date top, time bottom (where edit button was) */}
+                {createdDateParts.date ? (
+                  <View className="items-end ml-2">
+                    <Text className="text-dark-text text-xs font-semibold font-sans">
+                      {createdDateParts.date}
+                    </Text>
+                    {createdDateParts.time ? (
+                      <Text className="text-dark-muted text-[11px] font-medium font-sans mt-0.5">
+                        {createdDateParts.time}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
             </View>
           </View>
 
@@ -487,13 +544,6 @@ export default function DebtDetailScreen() {
             {debt.note && debt.note.trim().length > 0 ? (
               <Text className="text-dark-muted text-sm font-medium text-center mt-1.5 px-6 leading-relaxed font-sans">
                 {debt.note.trim()}
-              </Text>
-            ) : null}
-
-            {/* Created date & time text */}
-            {createdDateTimeText ? (
-              <Text className="text-dark-muted/70 text-xs font-medium text-center mt-2 font-sans">
-                {isLend ? "Lent on" : "Borrowed on"} {createdDateTimeText}
               </Text>
             ) : null}
 
@@ -551,7 +601,7 @@ export default function DebtDetailScreen() {
           {/* Due date / Time Left Bar (If no due date, show NOTHING, no card, no bg or borders) */}
           {dueDateInfo ? (
             <View className="mb-2">
-              <View className="flex-row items-center justify-between mb-2">
+              <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center gap-1.5">
                   <Ionicons
                     name={
@@ -561,24 +611,20 @@ export default function DebtDetailScreen() {
                     }
                     size={15}
                     color={
-                      dueDateInfo.isExpired && isOngoing
-                        ? "#F43F5E"
-                        : !isOngoing
-                          ? isRepaid
-                            ? "#10B981"
-                            : "#F59E0B"
-                          : "#94A3B8"
+                      !isOngoing
+                        ? isRepaid
+                          ? "#10B981"
+                          : "#F59E0B"
+                        : dueDateInfo.iconColor
                     }
                   />
                   <Text
                     className={`text-xs font-bold font-sans ${
-                      dueDateInfo.isExpired && isOngoing
-                        ? "text-rose-400"
-                        : !isOngoing
-                          ? isRepaid
-                            ? "text-emerald-400"
-                            : "text-amber-400"
-                          : "text-dark-text"
+                      !isOngoing
+                        ? isRepaid
+                          ? "text-emerald-400"
+                          : "text-amber-400"
+                        : dueDateInfo.textColor
                     }`}
                   >
                     {!isOngoing
@@ -601,27 +647,35 @@ export default function DebtDetailScreen() {
               <View className="h-2 bg-dark-surface rounded-full overflow-hidden w-full">
                 <View
                   style={{
-                    width: `${
-                      dueDateInfo.isExpired && isOngoing
-                        ? 100
-                        : dueDateInfo.timePercent
-                    }%`,
+                    width: `${dueDateInfo.clampedBarPercent}%`,
                   }}
                   className={`h-full rounded-full ${
-                    dueDateInfo.isExpired && isOngoing
-                      ? "bg-rose-500"
-                      : isRepaid
+                    !isOngoing
+                      ? isRepaid
                         ? "bg-emerald-400"
-                        : isSettledManually
-                          ? "bg-amber-400"
-                          : "bg-brand-accent"
+                        : "bg-amber-400"
+                      : dueDateInfo.barColor
                   }`}
                 />
               </View>
             </View>
           ) : null}
         </View>
-
+        {/* Centered round edit button */}
+        {isOngoing ? (
+          <View className="items-center w-full">
+            <TouchableOpacity
+              onPress={() =>
+                safePush(`/createdebt?debtId=${debt.id}&mode=edit`)
+              }
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              activeOpacity={0.7}
+              className="w-8 h-8 rounded-full items-center justify-center bg-dark-surface/80 border border-dark-border active:bg-dark-card"
+            >
+              <Ionicons name="pencil" size={14} color="#e8e9e5ff" />
+            </TouchableOpacity>
+          </View>
+        ) : null}
         {/* 3. Payment History Section */}
         <View className="mt-2">
           <Text className="text-dark-text font-bold text-base mb-3 font-sans">

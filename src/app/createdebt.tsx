@@ -13,7 +13,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Calendar, formatDisplayDate, getTodayYMD } from "../components/calendar";
+import {
+  Calendar,
+  formatDisplayDate,
+  getTodayYMD,
+} from "../components/calendar";
 import { ContactAvatar } from "../components/ContactAvatar";
 import { CreateContact } from "../components/contacts/CreateContact";
 import { Dropdown, DropdownOption } from "../components/Dropdown";
@@ -54,6 +58,21 @@ function formatTime(hour12: number, minute: number, period: "AM" | "PM") {
   const h = String(hour12).padStart(2, "0");
   const m = String(minute).padStart(2, "0");
   return `${h}:${m} ${period}`;
+}
+
+function parseIsoToTimeInfo(isoString?: string | null) {
+  if (!isoString) return getCurrentTimeInfo();
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return getCurrentTimeInfo();
+  let hours = d.getHours();
+  const minutes = d.getMinutes();
+  const period: "AM" | "PM" = hours >= 12 ? "PM" : "AM";
+  const hour12 = hours % 12 || 12;
+  return {
+    hour12,
+    minute: minutes,
+    period,
+  };
 }
 
 interface FieldRowProps {
@@ -100,7 +119,9 @@ function FieldRow({
         <View className="w-11 h-11 rounded-full bg-dark-surface border border-dark-border items-center justify-center mr-3">
           <Ionicons name={icon} size={20} color="#F8FAFC" />
         </View>
-        <Text className="text-dark-text text-sm font-semibold font-sans">{label}</Text>
+        <Text className="text-dark-text text-sm font-semibold font-sans">
+          {label}
+        </Text>
       </View>
 
       <View className="flex-row items-center gap-1.5 flex-shrink">
@@ -111,8 +132,8 @@ function FieldRow({
             disabled
               ? "text-dark-muted opacity-40 font-normal"
               : value
-              ? "text-dark-textSecondary font-medium"
-              : "text-dark-muted font-normal"
+                ? "text-dark-textSecondary font-medium"
+                : "text-dark-muted font-normal"
           }`}
         >
           {displayValue}
@@ -161,7 +182,9 @@ function SelectorField({
           <Text
             numberOfLines={1}
             className={`text-sm font-sans ml-3 flex-1 ${
-              value ? "text-dark-text font-medium" : "text-dark-muted font-normal"
+              value
+                ? "text-dark-text font-medium"
+                : "text-dark-muted font-normal"
             }`}
           >
             {value || placeholder}
@@ -191,7 +214,8 @@ export default function DedicatedDebtScreen() {
     recordRepayment,
     getDebtTransactions,
   } = useDebts();
-  const { transactions, deleteTransaction, updateTransaction } = useTransactions();
+  const { transactions, deleteTransaction, updateTransaction } =
+    useTransactions();
   const { contacts } = useContacts();
   const { accounts } = useAccounts();
   const { settings } = useAuth();
@@ -221,7 +245,9 @@ export default function DedicatedDebtScreen() {
       if (resolvedTxId) {
         return debtTxs.find((t) => t.id === resolvedTxId) || null;
       }
-      return debtTxs.find((t) => t.type === "LEND" || t.type === "BORROW") || null;
+      return (
+        debtTxs.find((t) => t.type === "LEND" || t.type === "BORROW") || null
+      );
     }
     return null;
   }, [resolvedTxId, resolvedDebtId, transactions, getDebtTransactions]);
@@ -274,18 +300,41 @@ export default function DedicatedDebtScreen() {
 
   // --- EDIT MODE STATE ---
   const [customEditAmount, setCustomEditAmount] = useState<string | null>(null);
-  const [customEditContactId, setCustomEditContactId] = useState<number | null>(null);
-  const [customEditDueDate, setCustomEditDueDate] = useState<string | null>(null);
+  const [customEditContactId, setCustomEditContactId] = useState<number | null>(
+    null,
+  );
+  const [customEditDate, setCustomEditDate] = useState<string | null>(null);
+  const [customEditTime, setCustomEditTime] = useState<string | null>(null);
+  const [customEditDueDate, setCustomEditDueDate] = useState<string | null>(
+    null,
+  );
   const [customEditNote, setCustomEditNote] = useState<string | null>(null);
 
-  const editAmount = customEditAmount ?? (targetDebt ? String(targetDebt.amount) : "");
+  const editAmount =
+    customEditAmount ?? (targetDebt ? String(targetDebt.amount) : "");
   const editContactId = customEditContactId ?? (targetDebt?.contactId || null);
+  const editDate =
+    customEditDate ??
+    (targetDebt?.createdAt ? targetDebt.createdAt.split("T")[0] : getTodayYMD());
+
+  const editTime = useMemo(() => {
+    if (customEditTime) return customEditTime;
+    if (targetDebt?.createdAt) {
+      const t = parseIsoToTimeInfo(targetDebt.createdAt);
+      return formatTime(t.hour12, t.minute, t.period);
+    }
+    const t = getCurrentTimeInfo();
+    return formatTime(t.hour12, t.minute, t.period);
+  }, [customEditTime, targetDebt?.createdAt]);
+
   const editDueDate = customEditDueDate ?? (targetDebt?.dueDate || "");
   const editNote = customEditNote ?? (targetDebt?.note || "");
 
   // --- PAYMENT MODE STATE ---
   const [paymentAmount, setPaymentAmount] = useState("");
-  const [selectedPaymentAssetId, setSelectedPaymentAssetId] = useState<number | null>(null);
+  const [selectedPaymentAssetId, setSelectedPaymentAssetId] = useState<
+    number | null
+  >(null);
   const paymentAssetId = selectedPaymentAssetId ?? (accounts[0]?.id || null);
   const [paymentDate, setPaymentDate] = useState(getTodayYMD());
   const [paymentNote, setPaymentNote] = useState("");
@@ -306,6 +355,8 @@ export default function DedicatedDebtScreen() {
   const resetEditToInitial = () => {
     setCustomEditAmount(null);
     setCustomEditContactId(null);
+    setCustomEditDate(null);
+    setCustomEditTime(null);
     setCustomEditDueDate(null);
     setCustomEditNote(null);
     setCurrentModeOverride("preview");
@@ -320,6 +371,7 @@ export default function DedicatedDebtScreen() {
 
   // Temporary Fly-up holding states
   const [tempContactId, setTempContactId] = useState<number | null>(null);
+  const [tempAssetId, setTempAssetId] = useState<number | null>(null);
   const [accountTypeTab, setAccountTypeTab] = useState<"BANK" | "CASH">("BANK");
   const [tempDueDate, setTempDueDate] = useState<string>("");
   const [tempNote, setTempNote] = useState("");
@@ -351,7 +403,7 @@ export default function DedicatedDebtScreen() {
   const filteredContacts = useMemo(() => {
     if (!contactSearch.trim()) return contacts;
     return contacts.filter((c) =>
-      c.name.toLowerCase().includes(contactSearch.toLowerCase())
+      c.name.toLowerCase().includes(contactSearch.toLowerCase()),
     );
   }, [contacts, contactSearch]);
 
@@ -361,7 +413,9 @@ export default function DedicatedDebtScreen() {
 
   // Open Fly-up Helpers
   function openContactSheet() {
-    setTempContactId(currentMode === "create" ? createContactId : editContactId);
+    setTempContactId(
+      currentMode === "create" ? createContactId : editContactId,
+    );
     setContactSearch("");
     setIsContactSheetOpen(true);
   }
@@ -377,12 +431,13 @@ export default function DedicatedDebtScreen() {
   }
 
   function openAccountSheet() {
+    setTempAssetId(currentMode === "create" ? createAssetId : paymentAssetId);
     setIsAccountSheetOpen(true);
   }
 
-  function handleSelectAccount(id: number | null) {
-    if (currentMode === "create") setCreateAssetId(id);
-    else if (currentMode === "payment") setSelectedPaymentAssetId(id);
+  function handleConfirmAccount() {
+    if (currentMode === "create") setCreateAssetId(tempAssetId);
+    else if (currentMode === "payment") setSelectedPaymentAssetId(tempAssetId);
     setIsAccountSheetOpen(false);
   }
 
@@ -392,32 +447,37 @@ export default function DedicatedDebtScreen() {
       setTempDueDate(txEditDate || today);
     } else if (currentMode === "create") {
       setTempDueDate(
-        createDueDate && createDueDate >= today ? createDueDate : today
+        createDueDate && createDueDate >= today ? createDueDate : today,
       );
     } else if (currentMode === "edit") {
-      setTempDueDate(
-        editDueDate && editDueDate >= today ? editDueDate : today
-      );
+      setTempDueDate(editDueDate && editDueDate >= today ? editDueDate : today);
     } else if (currentMode === "payment") {
       const debtCreatedDate = targetDebt?.createdAt
         ? targetDebt.createdAt.split("T")[0]
         : "";
       const initial = paymentDate || today;
       setTempDueDate(
-        debtCreatedDate && initial < debtCreatedDate ? debtCreatedDate : initial
+        debtCreatedDate && initial < debtCreatedDate
+          ? debtCreatedDate
+          : initial > today
+            ? today
+            : initial,
       );
     }
     setIsDateSheetOpen(true);
   }
 
-  // Date & Time Handlers for Create Mode
-  const openCreateDateTimeSheet = () => {
-    setTempCreateDate(createDate || getTodayYMD());
+  // Date & Time Handlers for Create & Edit Modes
+  const openDateTimeSheet = () => {
+    const activeDate =
+      currentMode === "edit" ? editDate : createDate || getTodayYMD();
+    const activeTime = currentMode === "edit" ? editTime : createTime;
+    setTempCreateDate(activeDate);
     let h = 12;
     let m = 0;
     let p: "AM" | "PM" = "AM";
-    if (createTime && createTime.includes(":")) {
-      const parts = createTime.split(" ");
+    if (activeTime && activeTime.includes(":")) {
+      const parts = activeTime.split(" ");
       const hm = (parts[0] || "").split(":");
       const parsedH = parseInt(hm[0], 10);
       const parsedM = parseInt(hm[1], 10);
@@ -437,6 +497,8 @@ export default function DedicatedDebtScreen() {
     setMinuteInput(String(m).padStart(2, "0"));
     setIsDateTimeSheetOpen(true);
   };
+
+  const openCreateDateTimeSheet = openDateTimeSheet;
 
   const handleHourChange = (val: string) => {
     const cleaned = val.replace(/[^0-9]/g, "");
@@ -487,8 +549,14 @@ export default function DedicatedDebtScreen() {
     if (isNaN(m) || m < 0) m = tempMinute || 0;
     if (m > 59) m = 59;
 
-    setCreateDate(tempCreateDate);
-    setCreateTime(formatTime(h, m, tempPeriod));
+    const formattedTime = formatTime(h, m, tempPeriod);
+    if (currentMode === "edit") {
+      setCustomEditDate(tempCreateDate);
+      setCustomEditTime(formattedTime);
+    } else {
+      setCreateDate(tempCreateDate);
+      setCreateTime(formattedTime);
+    }
     setIsDateTimeSheetOpen(false);
   };
 
@@ -507,13 +575,14 @@ export default function DedicatedDebtScreen() {
     if (isEditingTx) {
       if (
         debtCreatedDate &&
-        (targetTx?.type === "DEBT PAID" || targetTx?.type === "DEBT RECEIVED") &&
+        (targetTx?.type === "DEBT PAID" ||
+          targetTx?.type === "DEBT RECEIVED") &&
         tempDueDate < debtCreatedDate
       ) {
         showAlert({
           title: "Invalid Date",
           message: `Repayment date cannot be earlier than the debt creation date (${formatDisplayDate(
-            debtCreatedDate
+            debtCreatedDate,
           )}).`,
           type: "danger",
         });
@@ -529,8 +598,17 @@ export default function DedicatedDebtScreen() {
         showAlert({
           title: "Invalid Payment Date",
           message: `Payment date cannot be earlier than the debt creation date (${formatDisplayDate(
-            debtCreatedDate
+            debtCreatedDate,
           )}).`,
+          type: "danger",
+        });
+        return;
+      }
+      const today = getTodayYMD();
+      if (tempDueDate > today) {
+        showAlert({
+          title: "Invalid Payment Date",
+          message: "Payment date cannot be in the future.",
           type: "danger",
         });
         return;
@@ -642,7 +720,7 @@ export default function DedicatedDebtScreen() {
         showAlert({
           title: "Insufficient Balance",
           message: `Amount exceeds available account balance (${currencySymbol}${acct.currentBalance.toFixed(
-            2
+            2,
           )})`,
           type: "danger",
         });
@@ -651,7 +729,11 @@ export default function DedicatedDebtScreen() {
     }
 
     // Ensure due date is not earlier than loan date
-    if (createDueDate && createDueDate.trim() && createDueDate.trim() < createDate) {
+    if (
+      createDueDate &&
+      createDueDate.trim() &&
+      createDueDate.trim() < createDate
+    ) {
       showAlert({
         title: "Invalid Due Date",
         message: "Due date cannot be earlier than the loan date.",
@@ -702,7 +784,7 @@ export default function DedicatedDebtScreen() {
       showAlert({
         title: "Invalid Amount",
         message: `Amount cannot be less than the already repaid amount (${currencySymbol}${targetDebt.repaidAmount.toFixed(
-          2
+          2,
         )}).`,
         type: "danger",
       });
@@ -733,15 +815,15 @@ export default function DedicatedDebtScreen() {
     const diff = parsed - targetDebt.amount;
     if (diff > 0 && targetDebt.type === "LEND") {
       const acct = accounts.find(
-        (a) => a.id === (targetTx?.fromAssetId || targetTx?.toAssetId)
+        (a) => a.id === (targetTx?.fromAssetId || targetTx?.toAssetId),
       );
       if (acct && acct.currentBalance < diff) {
         showAlert({
           title: "Insufficient Balance",
           message: `Increasing the loan amount requires an additional ${currencySymbol}${diff.toFixed(
-            2
+            2,
           )}, which exceeds the available balance in ${acct.name} (${currencySymbol}${acct.currentBalance.toFixed(
-            2
+            2,
           )}).`,
           type: "danger",
         });
@@ -754,6 +836,8 @@ export default function DedicatedDebtScreen() {
       await updateDebt(targetDebt.id, {
         amount: parsed,
         contactId: editContactId,
+        date: editDate,
+        time: editTime,
         dueDate: editDueDate.trim() || null,
         note: editNote.trim() || null,
       });
@@ -790,7 +874,7 @@ export default function DedicatedDebtScreen() {
         ? `This debt has ${targetDebt.repaymentCount} recorded repayment(s) totaling ${formatCurrency(
             targetDebt.repaidAmount,
             settings?.currency,
-            settings?.numberFormat
+            settings?.numberFormat,
           )}. Deleting this debt will also delete all repayments and restore the funds to their respective accounts.`
         : "Are you sure you want to permanently delete this debt record? The initial transaction and account balance will be automatically reverted.",
       type: "danger",
@@ -839,7 +923,7 @@ export default function DedicatedDebtScreen() {
       showAlert({
         title: "Amount Exceeded",
         message: `Amount cannot exceed remaining balance (${currencySymbol}${targetDebt.remainingAmount.toFixed(
-          2
+          2,
         )}).`,
         type: "danger",
       });
@@ -862,7 +946,7 @@ export default function DedicatedDebtScreen() {
       showAlert({
         title: "Invalid Payment Date",
         message: `Payment date cannot be earlier than the debt creation date (${formatDisplayDate(
-          debtCreatedDate
+          debtCreatedDate,
         )}).`,
         type: "danger",
       });
@@ -899,7 +983,9 @@ export default function DedicatedDebtScreen() {
     const hasRepayments =
       isInitialDebtTx && targetDebt && (targetDebt.repaymentCount ?? 0) > 0;
 
-    const title = hasRepayments ? "Delete Debt & All Payments" : "Delete Transaction";
+    const title = hasRepayments
+      ? "Delete Debt & All Payments"
+      : "Delete Transaction";
     const message = hasRepayments
       ? `This initial loan transaction is linked to a debt with ${targetDebt.repaymentCount} recorded repayment(s). Deleting it will also delete the entire debt and all repayments, reverting funds to their respective accounts.`
       : "Are you sure you want to permanently delete this transaction record? The debt balance and account funds will be automatically updated.";
@@ -1032,12 +1118,12 @@ export default function DedicatedDebtScreen() {
     currentMode === "create"
       ? "Create Debt"
       : currentMode === "edit"
-      ? "Edit Debt"
-      : currentMode === "payment"
-      ? "Add Payment"
-      : isEditingTx
-      ? "Edit Transaction"
-      : "Transaction Details";
+        ? "Edit Debt"
+        : currentMode === "payment"
+          ? "Add Payment"
+          : isEditingTx
+            ? "Edit Transaction"
+            : "Transaction Details";
 
   return (
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-dark-bg">
@@ -1211,7 +1297,9 @@ export default function DedicatedDebtScreen() {
                   <Text className="text-dark-text text-sm font-semibold font-sans">
                     Note
                   </Text>
-                  <Text className="text-dark-muted text-xs font-sans">Optional</Text>
+                  <Text className="text-dark-muted text-xs font-sans">
+                    Optional
+                  </Text>
                 </View>
                 <View className="bg-dark-surface border border-dark-border rounded-2xl px-4 py-3.5">
                   <TextInput
@@ -1266,7 +1354,7 @@ export default function DedicatedDebtScreen() {
                         {formatCurrency(
                           targetDebt.remainingAmount,
                           settings?.currency,
-                          settings?.numberFormat
+                          settings?.numberFormat,
                         )}
                       </Text>
                     </Text>
@@ -1364,7 +1452,7 @@ export default function DedicatedDebtScreen() {
                       {formatCurrency(
                         targetDebt.repaidAmount,
                         settings?.currency,
-                        settings?.numberFormat
+                        settings?.numberFormat,
                       )}
                     </Text>
                   </Text>
@@ -1396,6 +1484,19 @@ export default function DedicatedDebtScreen() {
                 onPress={openContactSheet}
               />
 
+              {/* Date & Time Selector (Editable) */}
+              <SelectorField
+                label="Date & Time"
+                icon="calendar-outline"
+                value={`${
+                  editDate === getTodayYMD()
+                    ? "Today"
+                    : formatDisplayDate(editDate)
+                }, ${editTime}`}
+                placeholder="Select date & time"
+                onPress={openDateTimeSheet}
+              />
+
               {/* 5. Due Date Selector (Editable) */}
               <SelectorField
                 label="Due Date"
@@ -1411,7 +1512,9 @@ export default function DedicatedDebtScreen() {
                   <Text className="text-dark-text text-sm font-semibold font-sans">
                     Note
                   </Text>
-                  <Text className="text-dark-muted text-xs font-sans">Optional</Text>
+                  <Text className="text-dark-muted text-xs font-sans">
+                    Optional
+                  </Text>
                 </View>
                 <View className="bg-dark-surface border border-dark-border rounded-2xl px-4 py-3.5">
                   <TextInput
@@ -1435,22 +1538,26 @@ export default function DedicatedDebtScreen() {
               <View className="mb-6 w-full pt-3 pb-1 items-center justify-center">
                 <Text
                   className={`font-black text-5xl tracking-tight font-sans ${
-                    targetTx?.type === "BORROW" || targetTx?.type === "DEBT RECEIVED"
+                    targetTx?.type === "BORROW" ||
+                    targetTx?.type === "DEBT RECEIVED"
                       ? "text-emerald-400"
-                      : targetTx?.type === "LEND" || targetTx?.type === "DEBT PAID"
-                      ? "text-rose-400"
-                      : "text-brand-accent"
+                      : targetTx?.type === "LEND" ||
+                          targetTx?.type === "DEBT PAID"
+                        ? "text-rose-400"
+                        : "text-brand-accent"
                   }`}
                 >
-                  {targetTx?.type === "BORROW" || targetTx?.type === "DEBT RECEIVED"
+                  {targetTx?.type === "BORROW" ||
+                  targetTx?.type === "DEBT RECEIVED"
                     ? "+"
-                    : targetTx?.type === "LEND" || targetTx?.type === "DEBT PAID"
-                    ? "-"
-                    : ""}
+                    : targetTx?.type === "LEND" ||
+                        targetTx?.type === "DEBT PAID"
+                      ? "-"
+                      : ""}
                   {formatCurrency(
                     previewAmount,
                     settings?.currency,
-                    settings?.numberFormat
+                    settings?.numberFormat,
                   )}
                 </Text>
 
@@ -1465,22 +1572,24 @@ export default function DedicatedDebtScreen() {
                   <View className="items-center justify-center mt-2 px-6">
                     <Text
                       className={`font-semibold text-sm font-sans tracking-wide ${
-                        targetTx?.type === "BORROW" || targetTx?.type === "DEBT RECEIVED"
+                        targetTx?.type === "BORROW" ||
+                        targetTx?.type === "DEBT RECEIVED"
                           ? "text-emerald-400"
-                          : targetTx?.type === "LEND" || targetTx?.type === "DEBT PAID"
-                          ? "text-rose-400"
-                          : "text-brand-accent"
+                          : targetTx?.type === "LEND" ||
+                              targetTx?.type === "DEBT PAID"
+                            ? "text-rose-400"
+                            : "text-brand-accent"
                       }`}
                     >
                       {targetTx?.type === "LEND"
                         ? "Lent"
                         : targetTx?.type === "BORROW"
-                        ? "Borrowed"
-                        : targetTx?.type === "DEBT PAID"
-                        ? "Debt Paid"
-                        : targetTx?.type === "DEBT RECEIVED"
-                        ? "Debt Received"
-                        : "Transfer"}
+                          ? "Borrowed"
+                          : targetTx?.type === "DEBT PAID"
+                            ? "Debt Paid"
+                            : targetTx?.type === "DEBT RECEIVED"
+                              ? "Debt Received"
+                              : "Transfer"}
                     </Text>
 
                     {previewNote ? (
@@ -1513,7 +1622,9 @@ export default function DedicatedDebtScreen() {
               <FieldRow
                 icon="calendar-outline"
                 label="Date"
-                value={formatDisplayDate(isEditingTx ? txEditDate : previewDate)}
+                value={formatDisplayDate(
+                  isEditingTx ? txEditDate : previewDate,
+                )}
                 isReadOnly={!isEditingTx}
                 onPress={() => {
                   if (isEditingTx) {
@@ -1624,10 +1735,10 @@ export default function DedicatedDebtScreen() {
               ? "Select Payment Account"
               : "Select Deposit Account"
             : currentMode === "payment"
-            ? targetDebt?.type === "LEND"
-              ? "Select Deposit Account"
-              : "Select Payment Account"
-            : "Select Account"
+              ? targetDebt?.type === "LEND"
+                ? "Select Deposit Account"
+                : "Select Payment Account"
+              : "Select Account"
         }
       >
         {/* Account Type Selector (matches transaction creation type style) */}
@@ -1710,68 +1821,82 @@ export default function DedicatedDebtScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <ScrollView
-            className="max-h-[300px]"
-            showsVerticalScrollIndicator={false}
-          >
-            {accounts
-              .filter((a) => a.assetType === accountTypeTab)
-              .map((acc) => {
-                const isSelected =
-                  currentMode === "create"
-                    ? createAssetId === acc.id
-                    : paymentAssetId === acc.id;
+          <>
+            <ScrollView
+              className="max-h-[300px]"
+              showsVerticalScrollIndicator={false}
+            >
+              {accounts
+                .filter((a) => a.assetType === accountTypeTab)
+                .map((acc) => {
+                  const isSelected = tempAssetId === acc.id;
 
-                return (
-                  <TouchableOpacity
-                    key={acc.id}
-                    onPress={() => handleSelectAccount(acc.id)}
-                    activeOpacity={0.7}
-                    className={`flex-row items-center justify-between p-3.5 rounded-2xl mb-2 border ${
-                      isSelected
-                        ? "bg-brand-accent/10 border-brand-accent"
-                        : "bg-dark-card/50 border-dark-border"
-                    }`}
-                  >
-                    <View className="flex-row items-center gap-3">
-                      <View className="w-10 h-10 rounded-xl bg-dark-surface border border-dark-border items-center justify-center">
-                        <Ionicons
-                          name={
-                            acc.assetType === "BANK" ? "business" : "wallet"
-                          }
-                          size={18}
-                          color={isSelected ? "#D4F938" : "#94A3B8"}
-                        />
-                      </View>
-                      <View>
-                        <Text
-                          className={`text-sm font-bold font-sans ${
-                            isSelected ? "text-brand-accent" : "text-dark-text"
-                          }`}
-                        >
-                          {acc.name}
-                        </Text>
-                        {acc.accountNumber ? (
-                          <Text className="text-dark-muted text-[11px] font-sans">
-                            {acc.accountNumber}
+                  return (
+                    <TouchableOpacity
+                      key={acc.id}
+                      onPress={() => setTempAssetId(acc.id)}
+                      activeOpacity={0.7}
+                      className={`flex-row items-center justify-between p-3.5 rounded-2xl mb-2 border ${
+                        isSelected
+                          ? "bg-brand-accent/10 border-brand-accent"
+                          : "bg-dark-card/50 border-dark-border"
+                      }`}
+                    >
+                      <View className="flex-row items-center gap-3">
+                        <View className="w-10 h-10 rounded-xl bg-dark-surface border border-dark-border items-center justify-center">
+                          <Ionicons
+                            name={
+                              acc.assetType === "BANK" ? "business" : "wallet"
+                            }
+                            size={18}
+                            color={isSelected ? "#D4F938" : "#94A3B8"}
+                          />
+                        </View>
+                        <View>
+                          <Text
+                            className={`text-sm font-bold font-sans ${
+                              isSelected ? "text-brand-accent" : "text-dark-text"
+                            }`}
+                          >
+                            {acc.name}
                           </Text>
-                        ) : null}
+                          {acc.accountNumber ? (
+                            <Text className="text-dark-muted text-[11px] font-sans">
+                              {acc.accountNumber}
+                            </Text>
+                          ) : null}
+                        </View>
                       </View>
-                    </View>
 
-                    <View className="items-end">
-                      <Text className="text-sm font-bold text-dark-text font-sans">
-                        {formatCurrency(
-                          acc.currentBalance ?? 0,
-                          settings?.currency,
-                          settings?.numberFormat,
-                        )}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-          </ScrollView>
+                      <View className="items-end">
+                        <Text className="text-sm font-bold text-dark-text font-sans">
+                          {formatCurrency(
+                            acc.currentBalance ?? 0,
+                            settings?.currency,
+                            settings?.numberFormat,
+                          )}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+            </ScrollView>
+
+            <View className="mt-4">
+              <TouchableOpacity
+                onPress={handleConfirmAccount}
+                disabled={!tempAssetId}
+                activeOpacity={0.8}
+                className={`w-full py-3.5 rounded-2xl items-center justify-center ${
+                  tempAssetId ? "bg-brand-accent" : "bg-dark-surface opacity-50"
+                }`}
+              >
+                <Text className="text-dark-bg font-bold text-base font-sans">
+                  Done
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
         )}
       </HawkFlyUp>
 
@@ -1908,16 +2033,20 @@ export default function DedicatedDebtScreen() {
                   ? targetDebt.createdAt.split("T")[0]
                   : undefined
                 : isEditingTx
-                ? targetDebt &&
-                  (targetTx?.type === "DEBT PAID" ||
-                    targetTx?.type === "DEBT RECEIVED")
-                  ? targetDebt.createdAt
-                    ? targetDebt.createdAt.split("T")[0]
+                  ? targetDebt &&
+                    (targetTx?.type === "DEBT PAID" ||
+                      targetTx?.type === "DEBT RECEIVED")
+                    ? targetDebt.createdAt
+                      ? targetDebt.createdAt.split("T")[0]
+                      : undefined
                     : undefined
-                  : undefined
-                : getTodayYMD()
+                  : getTodayYMD()
             }
-            maxDate={currentMode === "payment" || isEditingTx ? getTodayYMD() : undefined}
+            maxDate={
+              currentMode === "payment" || isEditingTx
+                ? getTodayYMD()
+                : undefined
+            }
           />
           <TouchableOpacity
             onPress={handleConfirmDate}
@@ -1977,9 +2106,6 @@ export default function DedicatedDebtScreen() {
         {/* Digital Time Picker Section */}
         <View className="bg-dark-surface/80 border border-dark-border rounded-2xl p-4 mb-5">
           <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-dark-text text-sm font-bold font-sans">
-              Time
-            </Text>
             <TouchableOpacity
               onPress={() => {
                 const now = getCurrentTimeInfo();
@@ -2017,7 +2143,9 @@ export default function DedicatedDebtScreen() {
               </Text>
             </View>
 
-            <Text className="text-dark-text font-bold text-2xl pb-4 font-sans">:</Text>
+            <Text className="text-dark-text font-bold text-2xl pb-4 font-sans">
+              :
+            </Text>
 
             <View className="items-center">
               <TextInput
@@ -2078,7 +2206,9 @@ export default function DedicatedDebtScreen() {
           activeOpacity={0.8}
           className="bg-brand-accent py-3.5 rounded-2xl items-center justify-center"
         >
-          <Text className="text-dark-bg font-bold text-base font-sans">Done</Text>
+          <Text className="text-dark-bg font-bold text-base font-sans">
+            Done
+          </Text>
         </TouchableOpacity>
       </HawkFlyUp>
     </SafeAreaView>
