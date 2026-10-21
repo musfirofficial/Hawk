@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { addDatabaseChangeListener } from "expo-sqlite";
+import * as SecureStore from "expo-secure-store";
 import { db, ensureDatabaseInitialized, expoDb } from "../db";
 import * as schema from "../db/schema";
 import { LiquidAssetType } from "../db/schema";
@@ -50,6 +51,9 @@ interface AccountsContextType {
   totalCashBalance: number;
   totalLiquidAssets: number;
   isLoading: boolean;
+  showBalance: boolean;
+  setShowBalance: (show: boolean | ((prev: boolean) => boolean)) => void;
+  toggleShowBalance: () => void;
   refreshAccounts: () => void;
   createAccount: (data: CreateAccountInput) => Promise<void>;
   updateAccount: (id: number, data: UpdateAccountInput) => Promise<void>;
@@ -78,6 +82,34 @@ interface RawAccountQueryRow {
 export function AccountsProvider({ children }: { children: React.ReactNode }) {
   const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showBalance, setShowBalanceState] = useState(true);
+
+  // Load persisted balance visibility preference
+  useEffect(() => {
+    let isMounted = true;
+    SecureStore.getItemAsync("hawk_show_balance")
+      .then((val) => {
+        if (val !== null && isMounted) {
+          setShowBalanceState(val === "true");
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const setShowBalance = useCallback((show: boolean | ((prev: boolean) => boolean)) => {
+    setShowBalanceState((prev) => {
+      const next = typeof show === "function" ? show(prev) : show;
+      SecureStore.setItemAsync("hawk_show_balance", String(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const toggleShowBalance = useCallback(() => {
+    setShowBalance((prev) => !prev);
+  }, [setShowBalance]);
 
   const loadAccounts = useCallback(() => {
     try {
@@ -295,6 +327,9 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
         totalCashBalance,
         totalLiquidAssets,
         isLoading,
+        showBalance,
+        setShowBalance,
+        toggleShowBalance,
         refreshAccounts: loadAccounts,
         createAccount,
         updateAccount,

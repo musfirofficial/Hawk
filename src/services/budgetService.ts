@@ -129,18 +129,21 @@ export function getMonthBudgetSummary(month: string): MonthBudgetSummary {
   for (const row of categoryMapRows) {
     const spent = spentMap.get(row.category_id) || 0;
     const bAmt = Number(row.amount) || 0;
-    const remaining = bAmt - spent;
-    const progress = bAmt > 0 ? Math.round((spent / bAmt) * 100) : 0;
-    const isExceeded = spent - bAmt > 0.009;
-    const isCompleted = bAmt > 0 && Math.abs(bAmt - spent) <= 0.009;
+    const roundedSpent = Math.round(spent * 100) / 100;
+    const roundedBudget = Math.round(bAmt * 100) / 100;
+    const diff = Math.round((roundedBudget - roundedSpent) * 100) / 100;
+    const remaining = diff;
+    const progress = roundedBudget > 0 ? Math.round((roundedSpent / roundedBudget) * 100) : 0;
+    const isExceeded = roundedSpent > roundedBudget;
+    const isCompleted = roundedBudget > 0 && diff === 0;
 
     const catDetail: BudgetCategoryDetail = {
       id: row.id,
       categoryId: row.category_id,
       categoryName: row.category_name,
       categoryIcon: row.category_icon,
-      budgetAmount: bAmt,
-      spentAmount: spent,
+      budgetAmount: roundedBudget,
+      spentAmount: roundedSpent,
       remainingAmount: isCompleted ? 0 : remaining,
       progressPercent: progress,
       isExceeded,
@@ -439,16 +442,17 @@ export function getBudgetDetailById(id: number): BudgetDetail | null {
   let totalSpent = 0;
 
   const categories: BudgetCategoryDetail[] = categoryMapRows.map((cat) => {
-    const budgetAmount = Number(cat.amount) || 0;
-    const spentAmount = spentMap.get(cat.category_id) || 0;
-    const remainingAmount = budgetAmount - spentAmount;
+    const budgetAmount = Math.round((Number(cat.amount) || 0) * 100) / 100;
+    const spentAmount = Math.round((spentMap.get(cat.category_id) || 0) * 100) / 100;
+    const diff = Math.round((budgetAmount - spentAmount) * 100) / 100;
+    const remainingAmount = diff;
     const progressPercent = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : 0;
 
     totalBudget += budgetAmount;
     totalSpent += spentAmount;
 
-    const isExceeded = spentAmount - budgetAmount > 0.009;
-    const isCompleted = budgetAmount > 0 && Math.abs(budgetAmount - spentAmount) <= 0.009;
+    const isExceeded = spentAmount > budgetAmount;
+    const isCompleted = budgetAmount > 0 && diff === 0;
 
     return {
       id: cat.id,

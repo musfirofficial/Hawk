@@ -6,11 +6,22 @@ import { NumberFormatId, SUPPORTED_CURRENCIES } from "../db/schema";
 export function getCurrencySymbol(
   currencyCode?: string | null
 ): string {
-  const code = currencyCode || "USD";
-  const found = SUPPORTED_CURRENCIES.find(
-    (c) => c.code.toUpperCase() === code.toUpperCase()
+  if (!currencyCode || !currencyCode.trim()) {
+    return "$";
+  }
+  const clean = currencyCode.trim();
+
+  // Check if currencyCode is already a recognized symbol
+  const bySymbol = SUPPORTED_CURRENCIES.find((c) => c.symbol === clean);
+  if (bySymbol) return bySymbol.symbol;
+
+  // Check by ISO code (case-insensitive)
+  const byCode = SUPPORTED_CURRENCIES.find(
+    (c) => c.code.toUpperCase() === clean.toUpperCase()
   );
-  return found ? found.symbol : code;
+  if (byCode) return byCode.symbol;
+
+  return clean || "$";
 }
 
 /**

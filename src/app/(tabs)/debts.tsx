@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DebtCard } from "../../components/debts/DebtCard";
+import { useAccounts } from "../../context/accounts";
 import { useAuth } from "../../context/auth";
 import { DebtItem, useDebts } from "../../context/debts";
 import { useSafeRouter } from "../../hooks/useSafeRouter";
@@ -12,8 +13,8 @@ export default function DebtsScreen() {
   const router = useSafeRouter();
   const { debts, totalLentRemaining, totalBorrowedRemaining } = useDebts();
   const { settings } = useAuth();
+  const { showBalance, toggleShowBalance } = useAccounts();
 
-  const [showBalance, setShowBalance] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<DebtItem | null>(null);
 
   // Total receivable minus borrowed (Debt State)
@@ -61,7 +62,7 @@ export default function DebtsScreen() {
             {/* Actions: Eye Toggler & Add Debt Button */}
             <View className="flex-row items-center gap-2">
               <TouchableOpacity
-                onPress={() => setShowBalance(!showBalance)}
+                onPress={toggleShowBalance}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 className="w-8 h-8 rounded-full bg-dark-bg/15 items-center justify-center"
                 activeOpacity={0.7}

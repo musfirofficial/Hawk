@@ -13,26 +13,47 @@ import { formatCurrency } from "../../services/currency";
 export default function HomeScreen() {
   const router = useSafeRouter();
   const { settings } = useAuth();
-  const { totalLiquidAssets, totalBankBalance, totalCashBalance } =
-    useAccounts();
+  const {
+    totalLiquidAssets,
+    totalBankBalance,
+    totalCashBalance,
+    showBalance,
+    toggleShowBalance,
+  } = useAccounts();
   const { transactions, todayNetChange } = useTransactions();
 
-  const [showBalance, setShowBalance] = useState(false);
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
 
-  // Calculate Bank and Cash percentages
-  const safeBank = Math.max(0, totalBankBalance);
-  const safeCash = Math.max(0, totalCashBalance);
-  const combinedTotal = safeBank + safeCash;
+  // Calculate Bank and Cash percentages or overdraft indicators
+  const { bankDisplayPct, cashDisplayPct } = useMemo(() => {
+    const isBankNegative = totalBankBalance < 0;
+    const isCashNegative = totalCashBalance < 0;
 
-  const { bankPct, cashPct } = useMemo(() => {
-    if (combinedTotal <= 0) {
-      return { bankPct: 0, cashPct: 0 };
+    if (isBankNegative && isCashNegative) {
+      return { bankDisplayPct: "Overdraft", cashDisplayPct: "Overdraft" };
     }
-    const b = Math.round((safeBank / combinedTotal) * 100);
+    if (isBankNegative) {
+      return {
+        bankDisplayPct: "Overdraft",
+        cashDisplayPct: totalCashBalance > 0 ? "100%" : "0%",
+      };
+    }
+    if (isCashNegative) {
+      return {
+        bankDisplayPct: totalBankBalance > 0 ? "100%" : "0%",
+        cashDisplayPct: "Overdraft",
+      };
+    }
+
+    const combined = totalBankBalance + totalCashBalance;
+    if (combined <= 0) {
+      return { bankDisplayPct: "0%", cashDisplayPct: "0%" };
+    }
+
+    const b = Math.round((totalBankBalance / combined) * 100);
     const c = 100 - b;
-    return { bankPct: b, cashPct: c };
-  }, [safeBank, combinedTotal]);
+    return { bankDisplayPct: `${b}%`, cashDisplayPct: `${c}%` };
+  }, [totalBankBalance, totalCashBalance]);
 
   function handleOpenCreate(type: "EXPENSE" | "INCOME" | "TRANSFER") {
     router.push({
@@ -126,7 +147,7 @@ export default function HomeScreen() {
             {/* Actions: Eye Toggler & Add Account Button */}
             <View className="flex-row items-center gap-2">
               <TouchableOpacity
-                onPress={() => setShowBalance(!showBalance)}
+                onPress={toggleShowBalance}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 className="w-8 h-8 rounded-full bg-dark-bg/15 items-center justify-center"
                 activeOpacity={0.7}
@@ -173,7 +194,7 @@ export default function HomeScreen() {
                   <Ionicons name="business" size={14} color="#0B0D12" />
                 </View>
                 <Text className="text-dark-bg font-bold text-xs">
-                  {bankPct}%
+                  {bankDisplayPct}
                 </Text>
               </View>
 
@@ -202,7 +223,7 @@ export default function HomeScreen() {
                   <Ionicons name="wallet-outline" size={14} color="#0B0D12" />
                 </View>
                 <Text className="text-dark-bg font-bold text-xs">
-                  {cashPct}%
+                  {cashDisplayPct}
                 </Text>
               </View>
 

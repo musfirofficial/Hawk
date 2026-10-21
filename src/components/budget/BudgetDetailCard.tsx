@@ -23,11 +23,11 @@ export function BudgetDetailCard({
   currency,
   numberFormat,
 }: BudgetDetailCardProps) {
-  const isOverBudget = budget.totalRemaining < -0.009;
+  const isOverBudget = budget.totalRemaining < -0.005;
   const isZeroRemainingBudget =
     !isOverBudget &&
     budget.totalBudget > 0 &&
-    (budget.totalRemaining <= 0.009 ||
+    (Math.abs(budget.totalRemaining) <= 0.005 ||
       (budget.totalBudget > 0 && budget.totalSpent >= budget.totalBudget));
 
   return (
@@ -94,7 +94,7 @@ export function BudgetDetailCard({
 
               const isZeroRemaining =
                 !cat.isExceeded &&
-                (cat.remainingAmount <= 0.009 || cat.progressPercent >= 100);
+                (Math.abs(cat.remainingAmount) <= 0.005 || cat.progressPercent >= 100);
 
               return (
                 <View

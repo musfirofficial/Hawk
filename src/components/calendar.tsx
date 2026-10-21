@@ -660,8 +660,11 @@ export function Calendar({
             </View>
           </View>
 
-          {/* Universal Height Day Grid Container */}
-          <View style={{ height: CALENDAR_BODY_HEIGHT }} className="justify-between">
+          {/* Dynamic Height Day Grid Container (expands for 6-week months to prevent cutoff) */}
+          <View
+            style={{ height: weeks.length === 6 ? 296 : CALENDAR_BODY_HEIGHT }}
+            className="justify-between"
+          >
             {/* Weekday Names */}
             <View className="flex-row items-center justify-between h-6 mb-1">
               {WEEK_DAYS.map((day) => (

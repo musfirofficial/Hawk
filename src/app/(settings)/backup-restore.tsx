@@ -53,10 +53,14 @@ export default function BackupRestoreScreen() {
       const size = await getLocalDatabaseSize();
       setLocalDbSize(size);
 
-      const token = await getGoogleAccessToken();
-      if (token) {
-        const cloudMeta = await fetchCloudBackupMetadata(token);
-        setCloudBackup(cloudMeta);
+      if (settings?.googleEmail) {
+        const token = await getGoogleAccessToken();
+        if (token) {
+          const cloudMeta = await fetchCloudBackupMetadata(token);
+          setCloudBackup(cloudMeta);
+        }
+      } else {
+        setCloudBackup(null);
       }
     } catch (err) {
       console.warn("Failed to load backup metadata:", err);
@@ -68,29 +72,43 @@ export default function BackupRestoreScreen() {
   useEffect(() => {
     let isMounted = true;
 
-    if (settings?.googleEmail) {
-      (async () => {
-        try {
-          const size = await getLocalDatabaseSize();
+    (async () => {
+      try {
+        const size = await getLocalDatabaseSize();
+        if (isMounted) setLocalDbSize(size);
+
+        if (settings?.googleEmail) {
           const token = await getGoogleAccessToken();
           const cloudMeta = token
             ? await fetchCloudBackupMetadata(token)
             : null;
           if (isMounted) {
-            setLocalDbSize(size);
             setCloudBackup(cloudMeta);
-            setIsLoadingMetadata(false);
           }
-        } catch (err) {
-          console.warn("Failed to load backup metadata:", err);
-          if (isMounted) setIsLoadingMetadata(false);
+        } else if (isMounted) {
+          setCloudBackup(null);
         }
-      })();
-    } else {
+      } catch (err) {
+        console.warn("Failed to load backup metadata:", err);
+      } finally {
+        if (isMounted) setIsLoadingMetadata(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [settings?.googleEmail]);
+
+  // Handle Backup
+  async function handleBackup() {
+    if (isProcessing) return;
+
+    if (!settings?.googleEmail) {
       showConfirm({
         title: "Connect Google",
         message:
-          "Connect your Google account to back up and restore your data.",
+          "Connect your Google account to back up your database to Google Drive.",
         confirmText: "Connect",
         cancelText: "Cancel",
         onConfirm: async () => {
@@ -98,27 +116,18 @@ export default function BackupRestoreScreen() {
             const user = await signInWithGoogle();
             if (user) {
               await refreshMetadata();
-            } else if (isMounted) {
-              router.back();
             }
-          } catch {
-            if (isMounted) router.back();
+          } catch (err: any) {
+            showAlert({
+              title: "Connection Failed",
+              message: err?.message || "Could not connect Google account.",
+              type: "danger",
+            });
           }
         },
-        onCancel: () => {
-          if (isMounted) router.back();
-        },
       });
+      return;
     }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [settings?.googleEmail, router, showConfirm, signInWithGoogle]);
-
-  // Handle Backup
-  async function handleBackup() {
-    if (isProcessing) return;
 
     try {
       setIsProcessing(true);
@@ -269,6 +278,38 @@ export default function BackupRestoreScreen() {
 
             <View className="flex-row items-center justify-between py-3 border-b border-dark-border/40">
               <Text className="text-dark-muted text-sm font-sans">
+                Google Account
+              </Text>
+              {settings?.googleEmail ? (
+                <Text className="text-dark-text text-sm font-semibold font-sans">
+                  {settings.googleEmail}
+                </Text>
+              ) : (
+                <TouchableOpacity
+                  onPress={async () => {
+                    try {
+                      const user = await signInWithGoogle();
+                      if (user) await refreshMetadata();
+                    } catch (err: any) {
+                      showAlert({
+                        title: "Connection Failed",
+                        message: err?.message || "Could not connect Google account.",
+                        type: "danger",
+                      });
+                    }
+                  }}
+                  className="px-3 py-1 rounded-full bg-brand-accent/15 border border-brand-accent/40"
+                  activeOpacity={0.7}
+                >
+                  <Text className="text-brand-accent text-xs font-bold font-sans">
+                    Connect
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View className="flex-row items-center justify-between py-3 border-b border-dark-border/40">
+              <Text className="text-dark-muted text-sm font-sans">
                 Last Backup
               </Text>
               <Text className="text-dark-text text-sm font-semibold font-sans">
@@ -319,6 +360,8 @@ export default function BackupRestoreScreen() {
               <Text className="text-dark-text text-sm font-semibold font-sans">
                 {isLoadingMetadata
                   ? "Checking..."
+                  : !settings?.googleEmail
+                  ? "Not connected"
                   : cloudBackup
                   ? formatDateTime(cloudBackup.modifiedTime)
                   : "No backup found"}
@@ -341,11 +384,30 @@ export default function BackupRestoreScreen() {
 
           <View>
             <TouchableOpacity
-              onPress={handleRestorePrompt}
-              disabled={!cloudBackup || isProcessing || isLoadingMetadata}
+              onPress={
+                settings?.googleEmail
+                  ? handleRestorePrompt
+                  : async () => {
+                      try {
+                        const user = await signInWithGoogle();
+                        if (user) await refreshMetadata();
+                      } catch (err: any) {
+                        showAlert({
+                          title: "Connection Failed",
+                          message: err?.message || "Could not connect Google account.",
+                          type: "danger",
+                        });
+                      }
+                    }
+              }
+              disabled={
+                isProcessing ||
+                isLoadingMetadata ||
+                (Boolean(settings?.googleEmail) && !cloudBackup)
+              }
               activeOpacity={0.8}
               className={`w-full py-3.5 rounded-2xl items-center justify-center ${
-                cloudBackup && !isProcessing && !isLoadingMetadata
+                !settings?.googleEmail || (cloudBackup && !isProcessing && !isLoadingMetadata)
                   ? "bg-dark-surface border border-dark-border active:bg-dark-card"
                   : "bg-dark-surface/40 border border-dark-border/30 opacity-50"
               }`}
@@ -353,8 +415,14 @@ export default function BackupRestoreScreen() {
               {isProcessing && processStatus.includes("Restoring") ? (
                 <ActivityIndicator size="small" color="#F8FAFC" />
               ) : (
-                <Text className="text-dark-text text-base font-bold font-sans">
-                  Restore Database
+                <Text
+                  className={`text-base font-bold font-sans ${
+                    !settings?.googleEmail || (cloudBackup && !isProcessing && !isLoadingMetadata)
+                      ? "text-dark-text"
+                      : "text-dark-muted"
+                  }`}
+                >
+                  {!settings?.googleEmail ? "Connect to Restore" : "Restore Database"}
                 </Text>
               )}
             </TouchableOpacity>
