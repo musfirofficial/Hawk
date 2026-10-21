@@ -25,7 +25,7 @@ import { getGoogleAccessToken } from "../../services/googleAuth";
 
 export default function BackupRestoreScreen() {
   const router = useRouter();
-  const { settings, signInWithGoogle, reloadSettings } = useAuth();
+  const { settings, connectGoogle, reloadSettings } = useAuth();
   const { showAlert, showConfirm } = useAlert();
 
   const [localDbSize, setLocalDbSize] = useState<number>(0);
@@ -87,7 +87,7 @@ export default function BackupRestoreScreen() {
         cancelText: "Cancel",
         onConfirm: async () => {
           try {
-            const user = await signInWithGoogle();
+            const user = await connectGoogle();
             if (user) {
               await refreshMetadata();
             }
@@ -262,7 +262,7 @@ export default function BackupRestoreScreen() {
                 <TouchableOpacity
                   onPress={async () => {
                     try {
-                      const user = await signInWithGoogle();
+                      const user = await connectGoogle();
                       if (user) await refreshMetadata();
                     } catch (err: any) {
                       showAlert({
@@ -363,7 +363,7 @@ export default function BackupRestoreScreen() {
                   ? handleRestorePrompt
                   : async () => {
                       try {
-                        const user = await signInWithGoogle();
+                        const user = await connectGoogle();
                         if (user) await refreshMetadata();
                       } catch (err: any) {
                         showAlert({

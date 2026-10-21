@@ -93,8 +93,28 @@ export async function performGoogleSignOut(): Promise<void> {
 }
 
 /**
+ * Returns true when a GoogleSignIn error indicates the user must sign in interactively.
+ * Handles both numeric codes (Android) and string codes (iOS / newer SDK versions).
+ */
+function isSessionExpiredError(err: unknown): boolean {
+  const code = String((err as any)?.code ?? "");
+  const msg = String((err as any)?.message ?? "").toLowerCase();
+  return (
+    // Common Google Sign-In error codes for missing / expired sessions
+    code === "SIGN_IN_REQUIRED" ||
+    code === "NO_SAVED_CREDENTIAL_FOUND" ||
+    code === "4" || // SIGN_IN_REQUIRED on Android
+    code === "12501" || // User cancelled — treat as session gone
+    msg.includes("sign_in_required") ||
+    msg.includes("no saved credential")
+  );
+}
+
+/**
  * Retrieve Google OAuth access token for Google Drive API requests.
  * If forceRefresh is true, clears cached token and silently refreshes via Google Play Services.
+ * Throws a descriptive Error (instead of returning null) when the session is definitively gone
+ * so callers can surface a "Please reconnect your Google account" message.
  */
 export async function getGoogleAccessToken(
   forceRefresh = false,
@@ -114,6 +134,11 @@ export async function getGoogleAccessToken(
       try {
         await GoogleSignin.signInSilently();
       } catch (silentErr) {
+        if (isSessionExpiredError(silentErr)) {
+          console.warn("Google session expired during token refresh. User must reconnect.");
+          // Return null — callers already show a "reconnect" message on null
+          return null;
+        }
         console.warn("Silent sign-in failed during token refresh:", silentErr);
       }
     }
@@ -124,6 +149,10 @@ export async function getGoogleAccessToken(
         await GoogleSignin.signInSilently();
         tokens = await GoogleSignin.getTokens();
       } catch (silentErr) {
+        if (isSessionExpiredError(silentErr)) {
+          console.warn("Google session is gone. User needs to reconnect their account.");
+          return null;
+        }
         console.warn("Silent sign-in fallback failed:", silentErr);
       }
     }
