@@ -196,8 +196,15 @@ export function TransactionsProvider({
 
     let subscription: { remove: () => void } | undefined;
     try {
-      subscription = addDatabaseChangeListener(() => {
-        loadData();
+      subscription = addDatabaseChangeListener((event) => {
+        if (
+          !event?.tableName ||
+          event.tableName === "transactions" ||
+          event.tableName === "liquid_assets" ||
+          event.tableName === "debts"
+        ) {
+          loadData();
+        }
       });
     } catch (err) {
       console.warn("addDatabaseChangeListener error for transactions:", err);

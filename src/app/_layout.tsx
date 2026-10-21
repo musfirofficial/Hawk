@@ -12,7 +12,7 @@ import {
 } from "@expo-google-fonts/dm-sans";
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect } from "react";
-import { ActivityIndicator, LogBox, Platform, Text, TextInput, View } from "react-native";
+import { LogBox, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AccountsProvider } from "../context/accounts";
 import { AlertProvider } from "../context/alert";
@@ -38,31 +38,6 @@ if (Platform.OS === "android") {
     SystemUI.setBackgroundColorAsync("#0B0D12");
   } catch (e) {}
 }
-
-// Enforce DM Sans font family globally so device/system fonts are never visible
-// @ts-ignore
-if (Text.defaultProps == null) {
-  // @ts-ignore
-  Text.defaultProps = {};
-}
-// @ts-ignore
-Text.defaultProps.style = [
-  { fontFamily: "DMSans_400Regular" },
-  // @ts-ignore
-  Text.defaultProps.style,
-];
-
-// @ts-ignore
-if (TextInput.defaultProps == null) {
-  // @ts-ignore
-  TextInput.defaultProps = {};
-}
-// @ts-ignore
-TextInput.defaultProps.style = [
-  { fontFamily: "DMSans_400Regular" },
-  // @ts-ignore
-  TextInput.defaultProps.style,
-];
 
 function NavigationGate() {
   const { hasOnboarded, isLoading, settings, isAppUnlocked, hasPin } = useAuth();

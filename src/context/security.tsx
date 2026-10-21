@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { SecurityGuardModal } from "../components/SecurityGuardModal";
+import { useAuth } from "../context/auth";
 import { db, ensureDatabaseInitialized } from "../db";
 import * as schema from "../db/schema";
 import { SecurityRuleKey, SecurityRules } from "../db/schema";
@@ -25,10 +26,19 @@ const SecurityContext = createContext<SecurityContextType | undefined>(
 );
 
 export function SecurityProvider({ children }: { children: React.ReactNode }) {
+  const { hasPin, settings } = useAuth();
   const [activeRequest, setActiveRequest] = useState<SecurityRequest | null>(
     null
   );
-  const [rules, setRules] = useState<SecurityRules | null>(null);
+  const [rules, setRules] = useState<SecurityRules | null>(() => {
+    try {
+      ensureDatabaseInitialized();
+      const rows = db.select().from(schema.securityRules).limit(1).all();
+      return rows && rows.length > 0 ? rows[0] : null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     loadRules();
@@ -64,12 +74,22 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
   }
 
   function requireSecurityAuth(request: SecurityRequest) {
-    if (request.ruleKey) {
-      // Per-action security checks have been removed from the app
+    // If user has not set up a PIN, or PIN security is disabled, do not block the action
+    if (!hasPin || !settings?.pinEnabled) {
       request.onSuccess();
       return;
     }
 
+    // If the request specifies a ruleKey, check if that security rule is enabled
+    if (request.ruleKey) {
+      const isRuleActive = rules ? Boolean(rules[request.ruleKey]) : true;
+      if (!isRuleActive) {
+        request.onSuccess();
+        return;
+      }
+    }
+
+    // Rule is active and PIN is set up: prompt user for security authorization
     setActiveRequest(request);
   }
 

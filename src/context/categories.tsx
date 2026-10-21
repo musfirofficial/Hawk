@@ -100,8 +100,10 @@ export function CategoriesProvider({
 
     let subscription: { remove: () => void } | undefined;
     try {
-      subscription = addDatabaseChangeListener(() => {
-        loadData();
+      subscription = addDatabaseChangeListener((event) => {
+        if (!event?.tableName || event.tableName === "categories") {
+          loadData();
+        }
       });
     } catch (err) {
       console.warn("addDatabaseChangeListener error for categories:", err);

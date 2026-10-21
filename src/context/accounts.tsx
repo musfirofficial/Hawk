@@ -170,8 +170,14 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
     // Listen to real-time changes in SQLite database
     let subscription: { remove: () => void } | undefined;
     try {
-      subscription = addDatabaseChangeListener(() => {
-        loadAccounts();
+      subscription = addDatabaseChangeListener((event) => {
+        if (
+          !event?.tableName ||
+          event.tableName === "liquid_assets" ||
+          event.tableName === "transactions"
+        ) {
+          loadAccounts();
+        }
       });
     } catch (err) {
       console.warn("addDatabaseChangeListener failed:", err);

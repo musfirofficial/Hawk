@@ -243,8 +243,15 @@ export default function BudgetInsightScreen() {
   useEffect(() => {
     let sub: { remove: () => void } | undefined;
     try {
-      sub = addDatabaseChangeListener(() => {
-        loadData();
+      sub = addDatabaseChangeListener((event) => {
+        if (
+          !event?.tableName ||
+          event.tableName === "budgets" ||
+          event.tableName === "budget_categories" ||
+          event.tableName === "transactions"
+        ) {
+          loadData();
+        }
       });
     } catch {}
     return () => {

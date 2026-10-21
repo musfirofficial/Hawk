@@ -213,8 +213,15 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
 
     let subscription: { remove: () => void } | undefined;
     try {
-      subscription = addDatabaseChangeListener(() => {
-        loadDebts();
+      subscription = addDatabaseChangeListener((event) => {
+        if (
+          !event?.tableName ||
+          event.tableName === "debts" ||
+          event.tableName === "debt_logs" ||
+          event.tableName === "transactions"
+        ) {
+          loadDebts();
+        }
       });
     } catch (err) {
       console.warn("addDatabaseChangeListener error for debts:", err);

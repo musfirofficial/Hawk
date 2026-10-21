@@ -131,8 +131,14 @@ export function ContactsProvider({ children }: { children: React.ReactNode }) {
 
     let subscription: { remove: () => void } | undefined;
     try {
-      subscription = addDatabaseChangeListener(() => {
-        loadContacts();
+      subscription = addDatabaseChangeListener((event) => {
+        if (
+          !event?.tableName ||
+          event.tableName === "contacts" ||
+          event.tableName === "debts"
+        ) {
+          loadContacts();
+        }
       });
     } catch (err) {
       console.warn("addDatabaseChangeListener error for contacts:", err);

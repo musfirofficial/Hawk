@@ -1,4 +1,4 @@
-import { NumberFormatId, SUPPORTED_CURRENCIES } from "../db/schema";
+import { SUPPORTED_CURRENCIES } from "../db/schema";
 
 /**
  * Returns the currency symbol for a given ISO currency code.

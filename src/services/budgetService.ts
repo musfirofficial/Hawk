@@ -499,7 +499,7 @@ export function getAssignedCategoryIdsForMonth(
     JOIN budgets b ON b.id = bc.budget_id
     WHERE b.month = ?
   `;
-  const params: any[] = [month];
+  const params: (string | number)[] = [month];
   if (excludeBudgetId) {
     query += ` AND bc.budget_id != ?`;
     params.push(excludeBudgetId);
@@ -518,7 +518,7 @@ export function checkBudgetExistsForMonth(
 ): boolean {
   ensureDatabaseInitialized();
   let query = `SELECT id FROM budgets WHERE LOWER(name) = LOWER(?) AND month = ?`;
-  const params: any[] = [name.trim(), month];
+  const params: (string | number)[] = [name.trim(), month];
   if (excludeBudgetId) {
     query += ` AND id != ?`;
     params.push(excludeBudgetId);
@@ -570,6 +570,87 @@ export function setBudgetTemplate(budgetId: number, isTemplate: boolean) {
 }
 
 /**
+ * Helper to batch-fetch budget summary data across multiple months in 2 SQL queries
+ * rather than O(N*3) queries on the main thread.
+ */
+function fetchMonthsBudgetSummary(targetMonths: string[]): MonthSummaryItem[] {
+  if (targetMonths.length === 0) return [];
+
+  const placeholders = targetMonths.map(() => "?").join(", ");
+
+  // 1. Fetch budget counts and total allocated amount per month
+  const budgetRows = expoDb.getAllSync<{
+    month: string;
+    budgetCount: number;
+    totalBudget: number;
+  }>(
+    `
+    SELECT 
+      b.month,
+      COUNT(DISTINCT b.id) as budgetCount,
+      COALESCE(SUM(bc.amount), 0) as totalBudget
+    FROM budgets b
+    LEFT JOIN budget_categories bc ON bc.budget_id = b.id
+    WHERE b.month IN (${placeholders})
+    GROUP BY b.month;
+  `,
+    targetMonths
+  );
+
+  const budgetMap = new Map<string, { budgetCount: number; totalBudget: number }>();
+  for (const row of budgetRows) {
+    budgetMap.set(row.month, {
+      budgetCount: Number(row.budgetCount) || 0,
+      totalBudget: Math.round((Number(row.totalBudget) || 0) * 100) / 100,
+    });
+  }
+
+  // 2. Fetch total spent per month for categories allocated in that month's budgets
+  const spentRows = expoDb.getAllSync<{
+    month: string;
+    totalSpent: number;
+  }>(
+    `
+    SELECT 
+      bc.month,
+      COALESCE(SUM(t.amount), 0) as totalSpent
+    FROM budget_categories bc
+    JOIN transactions t ON t.category_id = bc.category_id 
+      AND t.type = 'EXPENSE' 
+      AND substr(t.date, 1, 7) = bc.month
+    WHERE bc.month IN (${placeholders})
+    GROUP BY bc.month;
+  `,
+    targetMonths
+  );
+
+  const spentMap = new Map<string, number>();
+  for (const row of spentRows) {
+    spentMap.set(row.month, Math.round((Number(row.totalSpent) || 0) * 100) / 100);
+  }
+
+  // 3. Assemble summaries preserving order of targetMonths
+  return targetMonths.map((month) => {
+    const bInfo = budgetMap.get(month) || { budgetCount: 0, totalBudget: 0 };
+    const totalSpent = spentMap.get(month) || 0;
+    const totalBudget = bInfo.totalBudget;
+    const isExceeded = totalSpent > totalBudget;
+    const savedAmount = isExceeded ? 0 : Math.max(0, Math.round((totalBudget - totalSpent) * 100) / 100);
+    const exceededAmount = isExceeded ? Math.round((totalSpent - totalBudget) * 100) / 100 : 0;
+
+    return {
+      month,
+      totalBudget,
+      totalSpent,
+      savedAmount,
+      exceededAmount,
+      isExceeded,
+      budgetCount: bInfo.budgetCount,
+    };
+  });
+}
+
+/**
  * Returns month-wise budget summaries across all distinct months in budgets.
  * Shows overall allocated amount and overall spent amount for all budgets in each month.
  */
@@ -581,23 +662,9 @@ export function getAllMonthsBudgetSummary(monthFilter?: string): MonthSummaryIte
     : `SELECT DISTINCT month FROM budgets ORDER BY month DESC;`;
   const params = monthFilter ? [monthFilter] : [];
   const monthRows = expoDb.getAllSync<{ month: string }>(query, params);
+  const months = monthRows.map((m) => m.month);
 
-  return monthRows.map((mRow) => {
-    const summary = getMonthBudgetSummary(mRow.month);
-    const isExceeded = summary.totalSpent > summary.totalBudget;
-    const savedAmount = isExceeded ? 0 : Math.max(0, summary.totalBudget - summary.totalSpent);
-    const exceededAmount = isExceeded ? summary.totalSpent - summary.totalBudget : 0;
-
-    return {
-      month: mRow.month,
-      totalBudget: summary.totalBudget,
-      totalSpent: summary.totalSpent,
-      savedAmount,
-      exceededAmount,
-      isExceeded,
-      budgetCount: summary.budgets.length,
-    };
-  });
+  return fetchMonthsBudgetSummary(months);
 }
 
 /**
@@ -631,23 +698,9 @@ export function getSavedTemplateMonths(): MonthSummaryItem[] {
   const monthRows = expoDb.getAllSync<{ month: string }>(`
     SELECT DISTINCT month FROM budgets WHERE template = 1 ORDER BY month DESC;
   `);
+  const months = monthRows.map((m) => m.month);
 
-  return monthRows.map((mRow) => {
-    const summary = getMonthBudgetSummary(mRow.month);
-    const isExceeded = summary.totalSpent > summary.totalBudget;
-    const savedAmount = isExceeded ? 0 : Math.max(0, summary.totalBudget - summary.totalSpent);
-    const exceededAmount = isExceeded ? summary.totalSpent - summary.totalBudget : 0;
-
-    return {
-      month: mRow.month,
-      totalBudget: summary.totalBudget,
-      totalSpent: summary.totalSpent,
-      savedAmount,
-      exceededAmount,
-      isExceeded,
-      budgetCount: summary.budgets.length,
-    };
-  });
+  return fetchMonthsBudgetSummary(months);
 }
 
 /**
@@ -663,6 +716,7 @@ export function getPreviousMonthYMD(monthYMD: string): string {
 
 /**
  * Copies all budgets and their category allocations from sourceMonth into targetMonth.
+ * Atomically handles existing categories in targetMonth to avoid UNIQUE constraint crashes.
  */
 export function copyMonthBudgets(sourceMonth: string, targetMonth: string) {
   ensureDatabaseInitialized();
@@ -693,24 +747,36 @@ export function copyMonthBudgets(sourceMonth: string, targetMonth: string) {
     catMap.set(c.budget_id, list);
   }
 
-  // 3. Insert into targetMonth
-  for (const b of srcBudgets) {
-    expoDb.runSync(
-      `INSERT INTO budgets (name, month, template) VALUES (?, ?, ?);`,
-      [b.name, targetMonth, b.template]
-    );
-    const lastIdRow = expoDb.getFirstSync<{ id: number }>(`SELECT last_insert_rowid() as id;`);
-    const newBudgetId = lastIdRow?.id;
-    if (newBudgetId) {
+  // Pre-fetch any existing category IDs already allocated in targetMonth
+  const existingCatRows = expoDb.getAllSync<{ category_id: number }>(
+    `SELECT category_id FROM budget_categories WHERE month = ?;`,
+    [targetMonth]
+  );
+  const existingCatIds = new Set(existingCatRows.map((r) => r.category_id));
+
+  // 3. Atomically insert into targetMonth
+  expoDb.withTransactionSync(() => {
+    for (const b of srcBudgets) {
       const cats = catMap.get(b.id) || [];
-      for (const cat of cats) {
-        expoDb.runSync(
-          `INSERT INTO budget_categories (budget_id, category_id, month, amount) VALUES (?, ?, ?, ?);`,
-          [newBudgetId, cat.category_id, targetMonth, cat.amount]
-        );
+      const newCats = cats.filter((cat) => !existingCatIds.has(cat.category_id));
+
+      expoDb.runSync(
+        `INSERT INTO budgets (name, month, template) VALUES (?, ?, ?);`,
+        [b.name, targetMonth, b.template]
+      );
+      const lastIdRow = expoDb.getFirstSync<{ id: number }>(`SELECT last_insert_rowid() as id;`);
+      const newBudgetId = lastIdRow?.id;
+      if (newBudgetId) {
+        for (const cat of newCats) {
+          expoDb.runSync(
+            `INSERT OR IGNORE INTO budget_categories (budget_id, category_id, month, amount) VALUES (?, ?, ?, ?);`,
+            [newBudgetId, cat.category_id, targetMonth, cat.amount]
+          );
+          existingCatIds.add(cat.category_id);
+        }
       }
     }
-  }
+  });
 }
 
 
