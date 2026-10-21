@@ -36,7 +36,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 if (Platform.OS === "android") {
   try {
     SystemUI.setBackgroundColorAsync("#0B0D12");
-  } catch (e) {}
+  } catch {}
 }
 
 function NavigationGate() {
@@ -65,9 +65,12 @@ function NavigationGate() {
       try {
         SystemUI.setBackgroundColorAsync("#0B0D12");
         NavigationBar.setStyle("light");
-      } catch (e) {}
+      } catch {}
     }
   }, []);
+
+  const appLockEnabled = Boolean(settings?.appLockEnabled);
+  const pinEnabled = Boolean(settings?.pinEnabled);
 
   useEffect(() => {
     if (isLoading) return;
@@ -91,9 +94,6 @@ function NavigationGate() {
       return;
     }
 
-    const appLockEnabled = Boolean(settings?.appLockEnabled);
-    const pinEnabled = Boolean(settings?.pinEnabled);
-
     const shouldLock = Boolean(
       hasOnboarded && appLockEnabled && pinEnabled && hasPin
     );
@@ -111,8 +111,8 @@ function NavigationGate() {
   }, [
     hasOnboarded,
     isLoading,
-    Boolean(settings?.appLockEnabled),
-    Boolean(settings?.pinEnabled),
+    appLockEnabled,
+    pinEnabled,
     hasPin,
     isAppUnlocked,
     segments,

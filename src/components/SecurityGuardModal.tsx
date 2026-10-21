@@ -50,6 +50,15 @@ export function SecurityGuardModal({
   const [biometricLabel, setBiometricLabel] = useState("Biometrics");
 
   const pinInputRef = useRef<TextInput>(null);
+  const onSuccessRef = useRef(onSuccess);
+  const descriptionRef = useRef(description);
+  const titleRef = useRef(title);
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+    descriptionRef.current = description;
+    titleRef.current = title;
+  });
 
   // Check initial lockout state when modal becomes visible
   useEffect(() => {
@@ -120,10 +129,10 @@ export function SecurityGuardModal({
         setTimeout(async () => {
           if (!isMounted) return;
           const res = await authenticateWithBiometrics(
-            description || title || "Confirm Action"
+            descriptionRef.current || titleRef.current || "Confirm Action"
           );
           if (res.success && isMounted) {
-            onSuccess();
+            onSuccessRef.current();
           } else if (res.error && res.error !== "Cancelled" && isMounted) {
             setErrorMsg(res.error);
           }

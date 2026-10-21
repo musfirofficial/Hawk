@@ -280,18 +280,20 @@ export function TransactionsProvider({
 
       if (tx && tx.debtId) {
         if (tx.type === "LEND" || tx.type === "BORROW") {
-          // Initial loan transaction: deleting it cascade-deletes all linked transactions, debt logs, & debt atomically
+          // Initial loan transaction: delete in reverse dependency order inside a transaction
+          // Order matters for the DB change listener: debtLogs → debts → transactions
+          // to prevent the listener from seeing a partially-deleted state
           expoDb.withTransactionSync(() => {
-            db.delete(schema.transactions)
-              .where(eq(schema.transactions.debtId, tx.debtId!))
-              .run();
-
             db.delete(schema.debtLogs)
               .where(eq(schema.debtLogs.debtId, tx.debtId!))
               .run();
 
             db.delete(schema.debts)
               .where(eq(schema.debts.id, tx.debtId!))
+              .run();
+
+            db.delete(schema.transactions)
+              .where(eq(schema.transactions.debtId, tx.debtId!))
               .run();
           });
 

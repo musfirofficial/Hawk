@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
@@ -48,13 +48,13 @@ export default function RecoveryKeyScreen() {
   });
   const [enablingBio, setEnablingBio] = useState(false);
 
-  function handleComplete() {
+  const handleComplete = useCallback(() => {
     if (origin === "startup") {
       router.replace("/" as any);
     } else {
       router.replace("/(tabs)");
     }
-  }
+  }, [origin, router]);
 
   // Handle Hardware back press dynamically based on origin
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function RecoveryKeyScreen() {
       }
     );
     return () => backHandler.remove();
-  }, [origin]);
+  }, [handleComplete]);
 
   useEffect(() => {
     async function checkBio() {

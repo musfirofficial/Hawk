@@ -10,8 +10,9 @@ export interface GoogleUserInfo {
 // Lazy reference to avoid TurboModuleRegistry errors in Expo Go
 function getGoogleSigninModule() {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { GoogleSignin } = require("@react-native-google-signin/google-signin");
+    // Dynamic import to avoid TurboModuleRegistry errors when module isn't available
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { GoogleSignin } = require("@react-native-google-signin/google-signin") as typeof import("@react-native-google-signin/google-signin");
     return GoogleSignin;
   } catch (error) {
     console.warn("Native GoogleSignin module not available in this environment:", error);

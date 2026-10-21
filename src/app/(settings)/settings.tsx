@@ -28,8 +28,6 @@ export default function SettingsScreen() {
     hasPin,
     connectGoogle,
     signInWithGoogle,
-    disconnectGoogle,
-    reloadSettings,
     updateSecuritySettings,
     isGoogleAuthEnabled,
   } = useAuth();

@@ -75,11 +75,13 @@ export default function DebtDetailScreen() {
 
   // Fetch transactions and logs for this debt
   const transactions = useMemo(() => {
+    void debts;
     if (!debtId) return [];
     return getDebtTransactions(debtId);
   }, [debtId, getDebtTransactions, debts]);
 
   const logs = useMemo(() => {
+    void debts;
     if (!debtId) return [];
     return getDebtLogs(debtId);
   }, [debtId, getDebtLogs, debts]);
@@ -119,22 +121,11 @@ export default function DebtDetailScreen() {
   }, [transactions, logs]);
 
   // Status computation
-  const isLend = debt?.type === "LEND";
   const isSettledManually = debt?.state === "WRITTEN_OFF";
   const isRepaid = debt?.state === "REPAID";
   const isOngoing = debt?.state === "ONGOING";
 
-  // Initial Loan Transaction to retrieve disbursement/deposit account
-  const initialTx = useMemo(() => {
-    return (
-      transactions.find((t) => t.type === "LEND" || t.type === "BORROW") || null
-    );
-  }, [transactions]);
 
-  const initialAccountName = useMemo(() => {
-    if (!initialTx) return null;
-    return initialTx.fromAssetName || initialTx.toAssetName || null;
-  }, [initialTx]);
 
   // Amount Repaid Progress %
   const progressPercent = useMemo(() => {

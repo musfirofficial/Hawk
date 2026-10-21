@@ -5,7 +5,7 @@ import { generateRecoveryKey, useAuth } from "../../context/auth";
 
 export default function ChangePinScreen() {
   const router = useRouter();
-  const { settings, updateSecuritySettings, hasPin } = useAuth();
+  const { updateSecuritySettings, hasPin } = useAuth();
   const hasExistingPin = hasPin;
 
   async function handleSuccess(pin: string) {

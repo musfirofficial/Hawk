@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
@@ -19,7 +19,6 @@ import { useSafeRouter } from "../../hooks/useSafeRouter";
 export default function VerifyCodeScreen() {
   const router = useSafeRouter();
   const {
-    settings,
     verifyRecoveryKey,
     setRecoverySessionVerified,
     recordFailedRecoveryAttempt,
@@ -70,13 +69,13 @@ export default function VerifyCodeScreen() {
     }
   }, [lockoutSeconds]);
 
-  function handleBack() {
+  const handleBack = useCallback(() => {
     if (origin === "startup") {
       router.safeReplace("/" as any);
     } else {
       router.safeBack();
     }
-  }
+  }, [origin, router]);
 
   // Intercept hardware back button
   useEffect(() => {
@@ -85,7 +84,7 @@ export default function VerifyCodeScreen() {
       return true;
     });
     return () => sub.remove();
-  }, [origin]);
+  }, [handleBack]);
 
   function handleCodeChange(val: string) {
     if (lockoutSeconds > 0) return;

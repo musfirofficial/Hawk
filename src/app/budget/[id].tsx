@@ -22,17 +22,7 @@ import {
 } from "../../services/budgetService";
 import { formatCurrency } from "../../services/currency";
 
-// Distinct palette for category segments & dots matching the reference design
-const SEGMENT_COLORS = [
-  "#22C55E", // Green
-  "#F43F5E", // Red
-  "#F59E0B", // Amber
-  "#38BDF8", // Sky Blue
-  "#A855F7", // Purple
-  "#E2E8F0", // Slate / Other
-  "#14B8A6", // Teal
-  "#EC4899", // Pink
-];
+
 
 interface BudgetBreakdownCardProps {
   budget: BudgetDetail;
@@ -91,7 +81,7 @@ function BudgetBreakdownCard({
 
       {/* Subtitle description */}
       <Text className="text-dark-muted text-xs font-medium mb-4 leading-4">
-        Here's a summary of your budget breakdown so far on {monthName}
+        Here&apos;s a summary of your budget breakdown so far on {monthName}
       </Text>
 
       {/* ── Segmented Progress Bar (matching image) ── */}

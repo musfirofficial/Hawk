@@ -19,7 +19,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { HawkModal } from "./HawkModal";
 import { formatLockoutRemaining, useAuth } from "../context/auth";
 import { BiometricAuthType } from "../services/biometrics";
-import { SafeTouchable } from "./common/SafeTouchable";
 
 export interface SetUpPinHandle {
   handleBack: () => boolean;

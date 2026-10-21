@@ -181,7 +181,6 @@ export default function FullTransactionScreen() {
   // Pagination state (20 per page)
   const PAGE_SIZE = 20;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const isLoadingMoreRef = useRef(false);
 
   const hasActiveFilters = useMemo(() => {
@@ -322,10 +321,8 @@ export default function FullTransactionScreen() {
     if (isLoadingMoreRef.current) return;
     if (visibleCount < filteredListTransactions.length) {
       isLoadingMoreRef.current = true;
-      setIsLoadingMore(true);
       setTimeout(() => {
         setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, filteredListTransactions.length));
-        setIsLoadingMore(false);
         isLoadingMoreRef.current = false;
       }, 250);
     }

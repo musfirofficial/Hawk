@@ -79,9 +79,7 @@ export function BudgetForm({
   );
 
   const [isCategoryFlyUpOpen, setIsCategoryFlyUpOpen] = useState(false);
-  const [isTemplate, setIsTemplate] = useState<boolean>(
-    initialBudget?.template ?? false,
-  );
+  const isTemplate = initialBudget?.template ?? false;
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

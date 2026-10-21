@@ -55,15 +55,15 @@ export function AccountsDonutChart({
   const safeCash = Math.max(0, cashBalance);
   const total = safeBank + safeCash;
 
-  const { bankPct, cashPct, activePct } = useMemo(() => {
+  const { activePct } = useMemo(() => {
     if (total <= 0) {
-      return { bankPct: 0, cashPct: 0, activePct: 0 };
+      return { activePct: 0 };
     }
     const bPct = Math.round((safeBank / total) * 100);
-    const cPct = 100 - bPct; // ensure summing to 100
+    const cPct = 100 - bPct;
     const aPct = activeType === "BANK" ? bPct : cPct;
-    return { bankPct: bPct, cashPct: cPct, activePct: aPct };
-  }, [safeBank, safeCash, total, activeType]);
+    return { activePct: aPct };
+  }, [safeBank, total, activeType]);
 
   // Calculate arc angles with rounded end caps and gaps
   const { bankPath, cashPath, singleSegment } = useMemo(() => {
@@ -100,7 +100,6 @@ export function AccountsDonutChart({
     return { bankPath: bPath, cashPath: cPath, singleSegment: null };
   }, [safeBank, safeCash, total, center, radius]);
 
-  const activeColor = activeType === "BANK" ? "#38BDF8" : "#22C55E";
   const activeLabel = activeType === "BANK" ? "Bank Share" : "Cash Share";
   const activeTag = activeType === "BANK" ? "Bank Active" : "Cash Active";
 

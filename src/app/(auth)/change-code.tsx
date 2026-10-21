@@ -20,7 +20,7 @@ export default function ChangeCodeScreen() {
         router.safeReplace("/(tabs)");
       }
     }
-  }, [isRecoverySessionVerified, origin]);
+  }, [isRecoverySessionVerified, origin, router]);
 
   async function handleSuccess(pin: string) {
     const newRecoveryKey = generateRecoveryKey();

@@ -367,17 +367,6 @@ export default function DedicatedDebtScreen() {
     }
   }, [targetTx]);
 
-  // Reset Edit state back to original
-  const resetEditToInitial = () => {
-    setCustomEditAmount(null);
-    setCustomEditContactId(null);
-    setCustomEditDate(null);
-    setCustomEditTime(null);
-    setCustomEditDueDate(null);
-    setCustomEditNote(null);
-    setCurrentModeOverride("preview");
-  };
-
   // Sub-modal Fly-Up states
   const [isContactSheetOpen, setIsContactSheetOpen] = useState(false);
   const [isCreateContactOpen, setIsCreateContactOpen] = useState(false);
@@ -423,9 +412,6 @@ export default function DedicatedDebtScreen() {
     );
   }, [contacts, contactSearch]);
 
-  const tabAccounts = useMemo(() => {
-    return accounts.filter((a) => a.assetType === accountTypeTab);
-  }, [accounts, accountTypeTab]);
 
   // Open Fly-up Helpers
   function openContactSheet() {
@@ -1138,6 +1124,38 @@ export default function DedicatedDebtScreen() {
     }
   }
 
+  // Compute display values for Preview/Edit — must come BEFORE any early return (Rules of Hooks)
+  const previewAmount = targetTx?.amount || targetDebt?.amount || 0;
+  const previewContactName =
+    targetDebt?.contactName ||
+    (targetTx as any)?.contactName ||
+    selectedContact?.name ||
+    "Contact";
+  const previewAccountName =
+    targetTx?.fromAssetName ||
+    targetTx?.toAssetName ||
+    selectedAccount?.name ||
+    "Account";
+  const previewDate = targetTx?.date || targetDebt?.dueDate || getTodayYMD();
+  const previewTime = useMemo(() => {
+    if (!targetTx?.createdAt) return "";
+    const t = parseIsoToTimeInfo(targetTx.createdAt);
+    return formatTime(t.hour12, t.minute, t.period);
+  }, [targetTx?.createdAt]);
+  const previewNote = targetTx?.note || targetDebt?.note || "";
+
+  // Title calculation
+  const titleText =
+    currentMode === "create"
+      ? "Create Debt"
+      : currentMode === "edit"
+        ? "Edit Debt"
+        : currentMode === "payment"
+          ? "Add Payment"
+          : isEditingTx
+            ? "Edit Transaction"
+            : "Transaction Details";
+
   // NOT FOUND STATE (if debtId was provided but records don't exist)
   if (currentMode !== "create" && !targetDebt && !targetTx) {
     return (
@@ -1197,37 +1215,7 @@ export default function DedicatedDebtScreen() {
     );
   }
 
-  // Compute display values for Preview/Edit
-  const previewAmount = targetTx?.amount || targetDebt?.amount || 0;
-  const previewContactName =
-    targetDebt?.contactName ||
-    (targetTx as any)?.contactName ||
-    selectedContact?.name ||
-    "Contact";
-  const previewAccountName =
-    targetTx?.fromAssetName ||
-    targetTx?.toAssetName ||
-    selectedAccount?.name ||
-    "Account";
-  const previewDate = targetTx?.date || targetDebt?.dueDate || getTodayYMD();
-  const previewTime = useMemo(() => {
-    if (!targetTx?.createdAt) return "";
-    const t = parseIsoToTimeInfo(targetTx.createdAt);
-    return formatTime(t.hour12, t.minute, t.period);
-  }, [targetTx?.createdAt]);
-  const previewNote = targetTx?.note || targetDebt?.note || "";
-
-  // Title calculation
-  const titleText =
-    currentMode === "create"
-      ? "Create Debt"
-      : currentMode === "edit"
-        ? "Edit Debt"
-        : currentMode === "payment"
-          ? "Add Payment"
-          : isEditingTx
-            ? "Edit Transaction"
-            : "Transaction Details";
+  // (preview values and titleText already computed above, before the not-found guard)
 
   return (
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-dark-bg">

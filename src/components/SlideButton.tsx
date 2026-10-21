@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -56,17 +56,18 @@ export function SlideButton({
   const isLoadingRef = useRef(isLoading);
   isLoadingRef.current = isLoading;
 
-  const panX = useRef(new Animated.Value(0)).current;
+  const panXRef = useRef(new Animated.Value(0));
+  const panX = panXRef.current;
   const isTriggered = useRef(false);
 
-  const resetThumb = () => {
+  const resetThumb = useCallback(() => {
     isTriggered.current = false;
     Animated.spring(panX, {
       toValue: 0,
       useNativeDriver: false,
       bounciness: 4,
     }).start();
-  };
+  }, [panX]);
 
   // Reset when loading completes
   useEffect(() => {
@@ -76,9 +77,9 @@ export function SlideButton({
       }, 350);
       return () => clearTimeout(timer);
     }
-  }, [isLoading]);
+  }, [isLoading, resetThumb]);
 
-  const panResponder = useRef(
+  const panResponderRef = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () =>
         !disabledRef.current && !isLoadingRef.current,
@@ -141,7 +142,8 @@ export function SlideButton({
         resetThumb();
       },
     })
-  ).current;
+  );
+  const panResponder = panResponderRef.current;
 
   // Fade text as slider approaches halfway
   const textOpacity =

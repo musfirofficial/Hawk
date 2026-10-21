@@ -40,7 +40,6 @@ export default function BudgetSummaryScreen() {
   // Pagination state (20 per page)
   const PAGE_SIZE = 20;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const isLoadingMoreRef = useRef(false);
 
   const loadData = useCallback(() => {
@@ -102,10 +101,8 @@ export default function BudgetSummaryScreen() {
       !isLoadingMoreRef.current
     ) {
       isLoadingMoreRef.current = true;
-      setIsLoadingMore(true);
       setTimeout(() => {
         setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, months.length));
-        setIsLoadingMore(false);
         isLoadingMoreRef.current = false;
       }, 250);
     }

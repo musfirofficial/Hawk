@@ -20,7 +20,7 @@ export function HawkModal({
       // "light" style sets light icon/buttons for dark background and prevents Android light scrim
       try {
         NavigationBar.setStyle("light");
-      } catch (e) {}
+      } catch {}
     }
   }, [visible]);
 

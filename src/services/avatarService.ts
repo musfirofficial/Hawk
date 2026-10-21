@@ -1,4 +1,4 @@
-import boring from "boring-avatars-vanilla";
+import { boring } from "boring-avatars-vanilla";
 
 export const AVATAR_THEME_COLORS = [
   "#D4F938", // brand accent (lime)

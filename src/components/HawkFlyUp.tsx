@@ -62,7 +62,8 @@ export function HawkFlyUp({
   keyboardVerticalOffset = 0,
 }: HawkFlyUpProps) {
   const insets = useSafeAreaInsets();
-  const panY = useRef(new Animated.Value(0)).current;
+  const panYRef = useRef(new Animated.Value(0));
+  const panY = panYRef.current;
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Track keyboard height dynamically to reliably lift modal above keypad on Android

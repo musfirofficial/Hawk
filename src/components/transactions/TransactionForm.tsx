@@ -70,7 +70,6 @@ export function TransactionForm({
 }: TransactionFormProps) {
   const router = useRouter();
   const {
-    transactions,
     createTransaction,
     updateTransaction,
     deleteTransaction,

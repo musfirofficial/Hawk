@@ -1,11 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DebtCard } from "../../components/debts/DebtCard";
 import { useAccounts } from "../../context/accounts";
 import { useAuth } from "../../context/auth";
-import { DebtItem, useDebts } from "../../context/debts";
+import { useDebts } from "../../context/debts";
 import { useSafeRouter } from "../../hooks/useSafeRouter";
 import { formatCurrency } from "../../services/currency";
 
@@ -14,8 +14,6 @@ export default function DebtsScreen() {
   const { debts, totalLentRemaining, totalBorrowedRemaining } = useDebts();
   const { settings } = useAuth();
   const { showBalance, toggleShowBalance } = useAccounts();
-
-  const [selectedDebt, setSelectedDebt] = useState<DebtItem | null>(null);
 
   // Total receivable minus borrowed (Debt State)
   const netDebt = totalLentRemaining - totalBorrowedRemaining;
@@ -192,7 +190,7 @@ export default function DebtsScreen() {
                 No Ongoing Debts
               </Text>
               <Text className="text-dark-muted font-sans text-xs mt-1 text-center max-w-[240px]">
-                You don't have any active loans or debts. Tap the + button to
+                You don&apos;t have any active loans or debts. Tap the + button to
                 record one.
               </Text>
             </View>

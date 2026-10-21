@@ -1,7 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import React from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { HawkToggle } from "../../components/HawkToggle";
@@ -33,7 +31,6 @@ const SYSTEM_RULES: RuleItem[] = [
 ];
 
 export default function SecurityPermissionsScreen() {
-  const router = useRouter();
   const { rules, updateRule } = useSecurityGuard();
 
   function renderGroup(title: string, items: RuleItem[]) {
