@@ -1,33 +1,41 @@
 {
   "expo": {
     "name": "Hawk",
-    "slug": "Hawk",
+    "slug": "hawk",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/logo/logo.png",
     "scheme": "hawk",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0B0D12",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/logo/logo.png",
       "bundleIdentifier": "com.musfir.thahir.Hawk",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "This app uses Face ID to securely log you into your account."
+        "NSFaceIDUsageDescription": "This app uses Face ID to securely log you into your account.",
+        "NSPhotoLibraryUsageDescription": "Hawk needs access to your photo library to let you select a profile picture.",
+        "NSCameraUsageDescription": "Hawk needs access to your camera to let you take a profile picture."
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#0B0D12",
+        "foregroundImage": "./assets/logo/logo.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.musfir.thahir.Hawk"
+      "package": "com.musfir.thahir.Hawk",
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png",
+      "favicon": "./assets/logo/logo.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -35,9 +43,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#0B0D12",
+          "image": "./assets/logo/logo-removebg-preview.png",
+          "imageWidth": 100
         }
       ],
       "expo-sqlite",
@@ -47,6 +55,13 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Allow Hawk to use Face ID for biometric authentication."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Hawk needs access to your photo library to let you select a profile picture.",
+          "cameraPermission": "Hawk needs access to your camera to let you take a profile picture."
         }
       ],
       [
@@ -61,6 +76,18 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "expo-navigation-bar": {
+        "enforceContrast": false,
+        "style": "light",
+        "hidden": false
+      },
+      "eas": {
+        "projectId": "63d267fc-aaf1-46ca-90e1-c4c00dadbc44"
+      }
+    },
+    "owner": "musfir.thahir"
   }
 }

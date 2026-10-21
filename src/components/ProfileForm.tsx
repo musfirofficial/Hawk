@@ -23,6 +23,7 @@ import {
 } from "../db/schema";
 import { CurrencyPicker } from "./CurrencyPicker";
 import { Dropdown } from "./Dropdown";
+import { HawkFlyUp } from "./HawkFlyUp";
 
 export interface ProfileFormData {
   name: string;
@@ -58,6 +59,7 @@ export function ProfileForm({
   const [profilePic, setProfilePic] = useState<string | null>(
     initialData?.profilePic || null,
   );
+  const [showPickerSheet, setShowPickerSheet] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string>(
     initialData?.currency || (mode === "onboarding" ? "" : "USD"),
   );
@@ -74,16 +76,23 @@ export function ProfileForm({
 
   const canSubmit = name.trim().length > 0 && selectedCurrency.length > 0;
 
-  async function handlePickImage() {
+  async function handlePickFromGallery() {
+    setShowPickerSheet(false);
     try {
       const permission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-      if (!permission.granted) {
+      // Check for full access OR limited/partial access (Android 14+ / iOS 14+)
+      const isAllowed =
+        permission.granted ||
+        permission.status === ImagePicker.PermissionStatus.GRANTED ||
+        (permission as any).accessPrivileges === "limited";
+
+      if (!isAllowed) {
         showAlert({
           title: "Permission Required",
           message:
-            "Please grant media gallery permissions to set your profile picture.",
+            "Please allow media library access (full or selected) to choose your profile picture.",
           type: "warning",
         });
         return;
@@ -93,7 +102,7 @@ export function ProfileForm({
         mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.2,
+        quality: 0.5,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -116,6 +125,54 @@ export function ProfileForm({
         type: "danger",
       });
     }
+  }
+
+  async function handleTakePhoto() {
+    setShowPickerSheet(false);
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+      if (!permission.granted && permission.status !== ImagePicker.PermissionStatus.GRANTED) {
+        showAlert({
+          title: "Permission Required",
+          message:
+            "Please grant camera permission to take a profile picture.",
+          type: "warning",
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const pickedUri = result.assets[0].uri;
+        const fileName = `profile_${Date.now()}.jpg`;
+        const destUri = `${FileSystem.documentDirectory}${fileName}`;
+
+        await FileSystem.copyAsync({
+          from: pickedUri,
+          to: destUri,
+        });
+
+        setProfilePic(destUri);
+      }
+    } catch (err) {
+      console.warn("Failed to capture photo:", err);
+      showAlert({
+        title: "Error",
+        message: "Could not capture photo. Please try again.",
+        type: "danger",
+      });
+    }
+  }
+
+  function handleRemovePhoto() {
+    setShowPickerSheet(false);
+    setProfilePic(null);
   }
 
   async function handleSubmit() {
@@ -162,7 +219,7 @@ export function ProfileForm({
         {/* Profile Picture / Avatar Picker */}
         <View className="items-center my-6">
           <TouchableOpacity
-            onPress={handlePickImage}
+            onPress={() => setShowPickerSheet(true)}
             activeOpacity={0.8}
             className="relative"
           >
@@ -302,6 +359,62 @@ export function ProfileForm({
         onSelect={(code) => setSelectedCurrency(code)}
         onClose={() => setCurrencyPickerVisible(false)}
       />
+
+      {/* Profile Picture Option Sheet */}
+      <HawkFlyUp
+        visible={showPickerSheet}
+        onClose={() => setShowPickerSheet(false)}
+        title="Profile Photo"
+        subtitle="Choose how to set your profile picture"
+      >
+        <View className="py-2 gap-2">
+          <TouchableOpacity
+            onPress={handleTakePhoto}
+            activeOpacity={0.7}
+            className="flex-row items-center p-4 bg-dark-card rounded-2xl border border-dark-border active:bg-dark-cardHover"
+          >
+            <View className="w-10 h-10 rounded-xl bg-brand-accent/10 items-center justify-center mr-3.5 border border-brand-accent/20">
+              <Ionicons name="camera" size={20} color="#D4F938" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-dark-text font-bold text-sm">Take Photo</Text>
+              <Text className="text-dark-muted text-xs mt-0.5">Use your camera to take a new picture</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#60677C" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handlePickFromGallery}
+            activeOpacity={0.7}
+            className="flex-row items-center p-4 bg-dark-card rounded-2xl border border-dark-border active:bg-dark-cardHover"
+          >
+            <View className="w-10 h-10 rounded-xl bg-brand-transfer/10 items-center justify-center mr-3.5 border border-brand-transfer/20">
+              <Ionicons name="images" size={20} color="#38BDF8" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-dark-text font-bold text-sm">Choose from Gallery</Text>
+              <Text className="text-dark-muted text-xs mt-0.5">Select full or limited photos from library</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#60677C" />
+          </TouchableOpacity>
+
+          {profilePic && (
+            <TouchableOpacity
+              onPress={handleRemovePhoto}
+              activeOpacity={0.7}
+              className="flex-row items-center p-4 bg-brand-expense/10 rounded-2xl border border-brand-expense/20 mt-1 active:bg-brand-expense/20"
+            >
+              <View className="w-10 h-10 rounded-xl bg-brand-expense/20 items-center justify-center mr-3.5">
+                <Ionicons name="trash-outline" size={18} color="#F43F5E" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-brand-expense font-bold text-sm">Remove Photo</Text>
+                <Text className="text-brand-expense/70 text-xs mt-0.5">Revert to default avatar</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+      </HawkFlyUp>
     </KeyboardAvoidingView>
   );
 }

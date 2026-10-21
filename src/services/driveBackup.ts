@@ -41,9 +41,10 @@ export function formatDateTime(isoString: string | null | undefined): string {
  */
 export async function getLocalDatabaseSize(): Promise<number> {
   try {
-    const dbPath =
+    const rawPath =
       expoDb.databasePath || `${FileSystem.documentDirectory}SQLite/hawk.db`;
-    const info = await FileSystem.getInfoAsync(dbPath);
+    const uri = rawPath.startsWith("file://") ? rawPath : `file://${rawPath}`;
+    const info = await FileSystem.getInfoAsync(uri);
     return info.exists ? (info as any).size || 0 : 0;
   } catch (err) {
     console.warn("Failed to get local database size:", err);
@@ -113,13 +114,14 @@ export async function fetchCloudBackupMetadata(
 export async function performBackupToDrive(
   accessToken: string
 ): Promise<DriveBackupMetadata> {
-  const snapshotPath = `${FileSystem.cacheDirectory}hawk_snapshot.db`;
+  const snapshotUri = `${FileSystem.cacheDirectory}hawk_snapshot.db`;
+  const snapshotPosixPath = snapshotUri.replace(/^file:\/\//, "");
   let token = accessToken;
 
   try {
     // 1. Create a clean vacuumed snapshot
-    await FileSystem.deleteAsync(snapshotPath, { idempotent: true });
-    expoDb.execSync(`VACUUM INTO '${snapshotPath}'`);
+    await FileSystem.deleteAsync(snapshotUri, { idempotent: true });
+    expoDb.execSync(`VACUUM INTO '${snapshotPosixPath}'`);
 
     // 2. Check if a backup file already exists on Drive
     let fileId: string | null = null;
@@ -181,7 +183,7 @@ export async function performBackupToDrive(
 
     // 3. Upload database file contents
     const uploadUrl = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`;
-    let uploadResult = await FileSystem.uploadAsync(uploadUrl, snapshotPath, {
+    let uploadResult = await FileSystem.uploadAsync(uploadUrl, snapshotUri, {
       httpMethod: "PATCH",
       uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
       headers: {
@@ -195,7 +197,7 @@ export async function performBackupToDrive(
       const freshToken = await getGoogleAccessToken(true);
       if (freshToken) {
         token = freshToken;
-        uploadResult = await FileSystem.uploadAsync(uploadUrl, snapshotPath, {
+        uploadResult = await FileSystem.uploadAsync(uploadUrl, snapshotUri, {
           httpMethod: "PATCH",
           uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
           headers: {
@@ -233,7 +235,7 @@ export async function performBackupToDrive(
       }
     );
   } finally {
-    await FileSystem.deleteAsync(snapshotPath, { idempotent: true });
+    await FileSystem.deleteAsync(snapshotUri, { idempotent: true });
   }
 }
 
@@ -245,17 +247,18 @@ export async function performRestoreFromDrive(
   accessToken: string,
   fileId: string
 ): Promise<void> {
-  const tempPath = `${FileSystem.cacheDirectory}hawk_restore_temp.db`;
+  const tempUri = `${FileSystem.cacheDirectory}hawk_restore_temp.db`;
+  const tempPosixPath = tempUri.replace(/^file:\/\//, "");
   let token = accessToken;
 
   try {
-    await FileSystem.deleteAsync(tempPath, { idempotent: true });
+    await FileSystem.deleteAsync(tempUri, { idempotent: true });
 
     // 1. Download file from Google Drive
     const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
     let downloadResult = await FileSystem.downloadAsync(
       downloadUrl,
-      tempPath,
+      tempUri,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -270,7 +273,7 @@ export async function performRestoreFromDrive(
         token = freshToken;
         downloadResult = await FileSystem.downloadAsync(
           downloadUrl,
-          tempPath,
+          tempUri,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -286,14 +289,14 @@ export async function performRestoreFromDrive(
       );
     }
 
-    const downloadInfo = await FileSystem.getInfoAsync(tempPath);
+    const downloadInfo = await FileSystem.getInfoAsync(tempUri);
     if (!downloadInfo.exists || ((downloadInfo as any).size || 0) <= 0) {
       throw new Error("Downloaded backup file is empty or corrupted.");
     }
 
     // 2. Attach downloaded database and copy data inside a safe transaction
     expoDb.execSync(`
-      ATTACH DATABASE '${tempPath}' AS backup_db;
+      ATTACH DATABASE '${tempPosixPath}' AS backup_db;
       PRAGMA foreign_keys = OFF;
     `);
 
@@ -331,7 +334,7 @@ export async function performRestoreFromDrive(
       }
     }
   } finally {
-    await FileSystem.deleteAsync(tempPath, { idempotent: true });
+    await FileSystem.deleteAsync(tempUri, { idempotent: true });
   }
 }
 
