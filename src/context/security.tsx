@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { SecurityGuardModal } from "../components/SecurityGuardModal";
 import { useAuth } from "../context/auth";
-import { db, ensureDatabaseInitialized } from "../db";
+import { db } from "../db";
 import * as schema from "../db/schema";
 import { SecurityRuleKey, SecurityRules } from "../db/schema";
 
@@ -32,7 +32,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
   );
   const [rules, setRules] = useState<SecurityRules | null>(() => {
     try {
-      ensureDatabaseInitialized();
       const rows = db.select().from(schema.securityRules).limit(1).all();
       return rows && rows.length > 0 ? rows[0] : null;
     } catch {
@@ -46,7 +45,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
   function loadRules() {
     try {
-      ensureDatabaseInitialized();
       const rows = db.select().from(schema.securityRules).limit(1).all();
       if (rows && rows.length > 0) {
         setRules(rows[0]);
@@ -58,7 +56,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
   async function updateRule(key: SecurityRuleKey, enabled: boolean) {
     try {
-      ensureDatabaseInitialized();
       db.update(schema.securityRules)
         .set({
           [key]: enabled,

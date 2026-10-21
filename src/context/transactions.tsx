@@ -8,7 +8,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { db, ensureDatabaseInitialized, expoDb } from "../db";
+import { db, expoDb } from "../db";
 import * as schema from "../db/schema";
 import { CategoryType, TransactionType } from "../db/schema";
 
@@ -124,7 +124,6 @@ export function TransactionsProvider({
 
   const loadData = useCallback(() => {
     try {
-      ensureDatabaseInitialized();
 
       // Query categories
       const catRows = expoDb.getAllSync<CategoryItem>(`
@@ -217,7 +216,6 @@ export function TransactionsProvider({
 
   const createTransaction = useCallback(
     async (data: CreateTransactionInput): Promise<number> => {
-      ensureDatabaseInitialized();
       const now = new Date().toISOString();
       const dateString = data.date || now.split("T")[0];
 
@@ -248,7 +246,6 @@ export function TransactionsProvider({
 
   const updateTransaction = useCallback(
     async (id: number, data: UpdateTransactionInput) => {
-      ensureDatabaseInitialized();
       const now = new Date().toISOString();
 
       const updateValues: Partial<typeof schema.transactions.$inferInsert> = {
@@ -278,7 +275,6 @@ export function TransactionsProvider({
 
   const deleteTransaction = useCallback(
     async (id: number) => {
-      ensureDatabaseInitialized();
 
       const tx = transactions.find((t) => t.id === id);
 

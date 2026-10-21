@@ -1,4 +1,4 @@
-import { expoDb, ensureDatabaseInitialized } from "../db";
+import { expoDb } from "../db";
 
 export interface BudgetCategoryDetail {
   id: number; // budget_categories.id
@@ -77,7 +77,6 @@ const CATEGORY_COLORS = [
  * Loads all budgets, category allocations, and calculated expenses for a given month ('YYYY-MM').
  */
 export function getMonthBudgetSummary(month: string): MonthBudgetSummary {
-  ensureDatabaseInitialized();
 
   // 1. Fetch budgets for this month
   const budgetRows = expoDb.getAllSync<{
@@ -255,7 +254,6 @@ export function createBudgetWithCategories(params: {
   template?: boolean;
   categories: { categoryId: number; amount: number }[];
 }): number {
-  ensureDatabaseInitialized();
 
   // 1. Insert into budgets
   expoDb.runSync(`INSERT INTO budgets (name, month, template) VALUES (?, ?, ?);`, [
@@ -294,7 +292,6 @@ export function updateBudgetWithCategories(
     categories: { categoryId: number; amount: number }[];
   }
 ) {
-  ensureDatabaseInitialized();
 
   // 1. Update budget name, month, and template
   expoDb.runSync(
@@ -323,7 +320,6 @@ export function updateBudgetWithCategories(
  * Ordered by month DESC, id DESC.
  */
 export function getAllBudgetsSummary(monthFilter?: string): BudgetSummaryItem[] {
-  ensureDatabaseInitialized();
   const query = monthFilter
     ? `SELECT id, name, month, COALESCE(template, 0) as template FROM budgets WHERE month = ? ORDER BY month DESC, id DESC;`
     : `SELECT id, name, month, COALESCE(template, 0) as template FROM budgets ORDER BY month DESC, id DESC;`;
@@ -394,7 +390,6 @@ export function getAllBudgetsSummary(monthFilter?: string): BudgetSummaryItem[] 
  * Loads a single budget's complete details including all its category breakdowns and expenses.
  */
 export function getBudgetDetailById(id: number): BudgetDetail | null {
-  ensureDatabaseInitialized();
   const bRow = expoDb.getFirstSync<{
     id: number;
     name: string;
@@ -492,7 +487,6 @@ export function getAssignedCategoryIdsForMonth(
   month: string,
   excludeBudgetId?: number
 ): number[] {
-  ensureDatabaseInitialized();
   let query = `
     SELECT DISTINCT bc.category_id
     FROM budget_categories bc
@@ -516,7 +510,6 @@ export function checkBudgetExistsForMonth(
   month: string,
   excludeBudgetId?: number
 ): boolean {
-  ensureDatabaseInitialized();
   let query = `SELECT id FROM budgets WHERE LOWER(name) = LOWER(?) AND month = ?`;
   const params: (string | number)[] = [name.trim(), month];
   if (excludeBudgetId) {
@@ -535,7 +528,6 @@ export function addCategoryToExistingBudget(
   categoryId: number,
   amount: number
 ) {
-  ensureDatabaseInitialized();
   const bRow = expoDb.getFirstSync<{ month: string }>(
     `SELECT month FROM budgets WHERE id = ?;`,
     [budgetId]
@@ -551,7 +543,6 @@ export function addCategoryToExistingBudget(
  * Deletes a budget and all its category mappings.
  */
 export function deleteBudget(budgetId: number) {
-  ensureDatabaseInitialized();
   expoDb.runSync(`DELETE FROM budget_categories WHERE budget_id = ?;`, [
     budgetId,
   ]);
@@ -562,7 +553,6 @@ export function deleteBudget(budgetId: number) {
  * Updates the template flag of a budget.
  */
 export function setBudgetTemplate(budgetId: number, isTemplate: boolean) {
-  ensureDatabaseInitialized();
   expoDb.runSync(
     `UPDATE budgets SET template = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;`,
     [isTemplate ? 1 : 0, budgetId]
@@ -655,7 +645,6 @@ function fetchMonthsBudgetSummary(targetMonths: string[]): MonthSummaryItem[] {
  * Shows overall allocated amount and overall spent amount for all budgets in each month.
  */
 export function getAllMonthsBudgetSummary(monthFilter?: string): MonthSummaryItem[] {
-  ensureDatabaseInitialized();
 
   const query = monthFilter
     ? `SELECT DISTINCT month FROM budgets WHERE month = ? ORDER BY month DESC;`
@@ -671,7 +660,6 @@ export function getAllMonthsBudgetSummary(monthFilter?: string): MonthSummaryIte
  * Toggles or sets the template flag for ALL budgets in a given month.
  */
 export function setMonthTemplate(month: string, isTemplate: boolean) {
-  ensureDatabaseInitialized();
   expoDb.runSync(
     `UPDATE budgets SET template = ?, updated_at = CURRENT_TIMESTAMP WHERE month = ?;`,
     [isTemplate ? 1 : 0, month]
@@ -682,7 +670,6 @@ export function setMonthTemplate(month: string, isTemplate: boolean) {
  * Returns whether all budgets in a given month are marked as template.
  */
 export function isMonthTemplate(month: string): boolean {
-  ensureDatabaseInitialized();
   const row = expoDb.getFirstSync<{ cnt: number; templateCnt: number }>(`
     SELECT COUNT(*) as cnt, SUM(CASE WHEN template = 1 THEN 1 ELSE 0 END) as templateCnt
     FROM budgets WHERE month = ?;
@@ -694,7 +681,6 @@ export function isMonthTemplate(month: string): boolean {
  * Returns all distinct months that have been saved as templates.
  */
 export function getSavedTemplateMonths(): MonthSummaryItem[] {
-  ensureDatabaseInitialized();
   const monthRows = expoDb.getAllSync<{ month: string }>(`
     SELECT DISTINCT month FROM budgets WHERE template = 1 ORDER BY month DESC;
   `);
@@ -719,7 +705,6 @@ export function getPreviousMonthYMD(monthYMD: string): string {
  * Atomically handles existing categories in targetMonth to avoid UNIQUE constraint crashes.
  */
 export function copyMonthBudgets(sourceMonth: string, targetMonth: string) {
-  ensureDatabaseInitialized();
 
   // 1. Fetch budgets for sourceMonth
   const srcBudgets = expoDb.getAllSync<{ id: number; name: string; template: number }>(

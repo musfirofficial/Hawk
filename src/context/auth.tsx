@@ -84,6 +84,7 @@ interface AuthContextType {
     pinEnabled?: boolean;
     appLockEnabled?: boolean;
   }) => Promise<void>;
+  connectGoogle: (user?: GoogleUserInfo) => Promise<GoogleUserInfo | null>;
   disconnectGoogle: () => Promise<void>;
   reloadSettings: () => void;
 }
@@ -205,7 +206,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function loadSettingsFromDB() {
     try {
-      ensureDatabaseInitialized();
       const rows = db.select().from(schema.appSettings).limit(1).all();
       let pinExists = await hasSecurePin();
 
@@ -269,7 +269,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     appLockEnabled?: boolean;
   }) {
     try {
-      ensureDatabaseInitialized();
       const existing = db.select().from(schema.appSettings).limit(1).all();
 
       const googleEmail = pendingGoogleUser?.email || null;
@@ -354,7 +353,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     appLockEnabled?: boolean;
   }) {
     try {
-      ensureDatabaseInitialized();
       if (params.pin !== undefined) {
         if (params.pin) {
           await saveSecurePin(params.pin);
@@ -431,6 +429,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAppUnlocked(false);
   }
 
+  // Connect Google Account and persist to appSettings
+  async function connectGoogle(user?: GoogleUserInfo): Promise<GoogleUserInfo | null> {
+    try {
+      const googleUser = user || (await signInWithGoogle());
+      if (googleUser && settings) {
+        db.update(schema.appSettings)
+          .set({
+            googleEmail: googleUser.email,
+            googleName: googleUser.name,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(schema.appSettings.id, settings.id))
+          .run();
+        await loadSettingsFromDB();
+      }
+      return googleUser;
+    } catch (err) {
+      console.error("Error connecting Google:", err);
+      throw err;
+    }
+  }
+
   // Disconnect Google Account
   async function disconnectGoogle() {
     try {
@@ -472,7 +492,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     remainingSeconds: number;
   }> {
     try {
-      ensureDatabaseInitialized();
       const existing = db.select().from(schema.appSettings).limit(1).all();
       if (existing.length === 0)
         return { lockedOut: false, remainingSeconds: 0 };
@@ -521,7 +540,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function resetRecoveryAttempts() {
     try {
-      ensureDatabaseInitialized();
       const existing = db.select().from(schema.appSettings).limit(1).all();
       if (existing.length > 0) {
         db.update(schema.appSettings)
@@ -552,7 +570,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     remainingSeconds: number;
   }> {
     try {
-      ensureDatabaseInitialized();
       const existing = db.select().from(schema.appSettings).limit(1).all();
       if (existing.length === 0)
         return { lockedOut: false, remainingSeconds: 0 };
@@ -601,7 +618,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function resetPinAttempts() {
     try {
-      ensureDatabaseInitialized();
       const existing = db.select().from(schema.appSettings).limit(1).all();
       if (existing.length > 0) {
         db.update(schema.appSettings)
@@ -648,6 +664,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithGoogle,
         completeOnboarding,
         updateSecuritySettings,
+        connectGoogle,
         disconnectGoogle,
         reloadSettings: loadSettingsFromDB,
       }}

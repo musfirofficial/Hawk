@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { eq } from "drizzle-orm";
 import { useSafeRouter } from "../../hooks/useSafeRouter";
 import { useEffect, useState } from "react";
 import {
@@ -15,8 +14,6 @@ import { ScreenHeader } from "../../components/ScreenHeader";
 import { useAlert } from "../../context/alert";
 import { useAuth } from "../../context/auth";
 import { useSecurityGuard } from "../../context/security";
-import { db } from "../../db";
-import * as schema from "../../db/schema";
 import {
   authenticateWithBiometrics,
   BiometricCapability,
@@ -29,6 +26,7 @@ export default function SettingsScreen() {
   const {
     settings,
     hasPin,
+    connectGoogle,
     signInWithGoogle,
     disconnectGoogle,
     reloadSettings,
@@ -73,18 +71,7 @@ export default function SettingsScreen() {
 
     try {
       setConnecting(true);
-      const googleInfo = await signInWithGoogle();
-      if (googleInfo && settings) {
-        db.update(schema.appSettings)
-          .set({
-            googleEmail: googleInfo.email,
-            googleName: googleInfo.name,
-            updatedAt: new Date().toISOString(),
-          })
-          .where(eq(schema.appSettings.id, settings.id))
-          .run();
-        reloadSettings();
-      }
+      await connectGoogle();
     } catch (err: any) {
       if (err?.code !== "12501") {
         showAlert({

@@ -400,3 +400,7 @@ export function ensureDatabaseInitialized() {
     console.error("Critical: Could not initialize database schema:", error);
   }
 }
+
+// Ensure database schema and migrations run synchronously once on startup
+ensureDatabaseInitialized();
+

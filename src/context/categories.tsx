@@ -7,7 +7,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import { db, ensureDatabaseInitialized, expoDb } from "../db";
+import { db, expoDb } from "../db";
 import { CategoryType } from "../db/schema";
 import * as schema from "../db/schema";
 
@@ -64,7 +64,6 @@ export function CategoriesProvider({
 
   const loadData = useCallback(() => {
     try {
-      ensureDatabaseInitialized();
 
       const rows = expoDb.getAllSync<RawCategoryQueryRow>(`
         SELECT 
@@ -116,7 +115,6 @@ export function CategoriesProvider({
 
   const createCategory = useCallback(
     async (data: CreateCategoryInput): Promise<number> => {
-      ensureDatabaseInitialized();
 
       try {
         const inserted = db
@@ -151,7 +149,6 @@ export function CategoriesProvider({
 
   const updateCategory = useCallback(
     async (id: number, data: UpdateCategoryInput) => {
-      ensureDatabaseInitialized();
 
       db.update(schema.categories)
         .set({
@@ -171,7 +168,6 @@ export function CategoriesProvider({
     async (
       id: number
     ): Promise<{ success: boolean; hasTransactions: boolean }> => {
-      ensureDatabaseInitialized();
 
       // Check linked transactions count
       const checkRow = expoDb.getFirstSync<{ count: number }>(

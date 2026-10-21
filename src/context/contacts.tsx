@@ -7,7 +7,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import { db, ensureDatabaseInitialized, expoDb } from "../db";
+import { db, expoDb } from "../db";
 import * as schema from "../db/schema";
 import { generateContactAvatar } from "../services/avatarService";
 
@@ -72,7 +72,6 @@ export function ContactsProvider({ children }: { children: React.ReactNode }) {
 
   const loadContacts = useCallback(() => {
     try {
-      ensureDatabaseInitialized();
 
       const rows = expoDb.getAllSync<RawContactQueryRow>(`
         SELECT 
@@ -151,7 +150,6 @@ export function ContactsProvider({ children }: { children: React.ReactNode }) {
 
   const createContact = useCallback(
     async (data: CreateContactInput): Promise<number> => {
-      ensureDatabaseInitialized();
       const now = new Date().toISOString();
       const trimmedName = data.name.trim();
 
@@ -190,7 +188,6 @@ export function ContactsProvider({ children }: { children: React.ReactNode }) {
 
   const updateContact = useCallback(
     async (id: number, data: UpdateContactInput) => {
-      ensureDatabaseInitialized();
       const now = new Date().toISOString();
 
       const updateValues: Partial<typeof schema.contacts.$inferInsert> = {
@@ -230,7 +227,6 @@ export function ContactsProvider({ children }: { children: React.ReactNode }) {
 
   const deleteContact = useCallback(
     async (id: number): Promise<{ archived: boolean }> => {
-      ensureDatabaseInitialized();
 
       const txRow = expoDb.getFirstSync<{ count: number }>(
         `SELECT (SELECT COUNT(*) FROM transactions WHERE contact_id = ?) + (SELECT COUNT(*) FROM debts WHERE contact_id = ?) AS count;`,

@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
@@ -48,17 +48,18 @@ export default function BackupRestoreScreen() {
   }, [isProcessing]);
 
   // Load local and cloud backup metadata
-  async function refreshMetadata() {
+  const refreshMetadata = useCallback(async () => {
     try {
+      setIsLoadingMetadata(true);
       const size = await getLocalDatabaseSize();
       setLocalDbSize(size);
 
       if (settings?.googleEmail) {
         const token = await getGoogleAccessToken();
-        if (token) {
-          const cloudMeta = await fetchCloudBackupMetadata(token);
-          setCloudBackup(cloudMeta);
-        }
+        const cloudMeta = token
+          ? await fetchCloudBackupMetadata(token)
+          : null;
+        setCloudBackup(cloudMeta);
       } else {
         setCloudBackup(null);
       }
@@ -67,38 +68,11 @@ export default function BackupRestoreScreen() {
     } finally {
       setIsLoadingMetadata(false);
     }
-  }
+  }, [settings?.googleEmail]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    (async () => {
-      try {
-        const size = await getLocalDatabaseSize();
-        if (isMounted) setLocalDbSize(size);
-
-        if (settings?.googleEmail) {
-          const token = await getGoogleAccessToken();
-          const cloudMeta = token
-            ? await fetchCloudBackupMetadata(token)
-            : null;
-          if (isMounted) {
-            setCloudBackup(cloudMeta);
-          }
-        } else if (isMounted) {
-          setCloudBackup(null);
-        }
-      } catch (err) {
-        console.warn("Failed to load backup metadata:", err);
-      } finally {
-        if (isMounted) setIsLoadingMetadata(false);
-      }
-    })();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [settings?.googleEmail]);
+    refreshMetadata();
+  }, [refreshMetadata]);
 
   // Handle Backup
   async function handleBackup() {

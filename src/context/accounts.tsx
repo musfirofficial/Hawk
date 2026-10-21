@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { addDatabaseChangeListener } from "expo-sqlite";
 import * as SecureStore from "expo-secure-store";
-import { db, ensureDatabaseInitialized, expoDb } from "../db";
+import { db, expoDb } from "../db";
 import * as schema from "../db/schema";
 import { LiquidAssetType } from "../db/schema";
 
@@ -113,7 +113,6 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
 
   const loadAccounts = useCallback(() => {
     try {
-      ensureDatabaseInitialized();
 
       // Query active accounts with calculated incoming & outgoing transaction balances
       const rows = expoDb.getAllSync<RawAccountQueryRow>(`
@@ -190,7 +189,6 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
 
   const createAccount = useCallback(
     async (data: CreateAccountInput) => {
-      ensureDatabaseInitialized();
       const now = new Date().toISOString();
 
       db.insert(schema.liquidAssets)
@@ -213,7 +211,6 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
 
   const updateAccount = useCallback(
     async (id: number, data: UpdateAccountInput) => {
-      ensureDatabaseInitialized();
       const now = new Date().toISOString();
 
       const updateValues: Partial<typeof schema.liquidAssets.$inferInsert> = {
@@ -245,7 +242,6 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
    */
   const deleteAccount = useCallback(
     async (id: number, force?: boolean): Promise<{ archived: boolean }> => {
-      ensureDatabaseInitialized();
 
       if (force) {
         // Force delete: clean up linked transactions first to avoid foreign key constraints

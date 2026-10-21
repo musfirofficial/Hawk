@@ -8,7 +8,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { db, ensureDatabaseInitialized, expoDb } from "../db";
+import { db, expoDb } from "../db";
 import * as schema from "../db/schema";
 import { DebtState, DebtType } from "../db/schema";
 import { localDateTimeToIso } from "../components/calendar";
@@ -134,7 +134,6 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
 
   const loadDebts = useCallback(() => {
     try {
-      ensureDatabaseInitialized();
 
       const rows = expoDb.getAllSync<RawDebtQueryRow>(`
         SELECT 
@@ -234,7 +233,6 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
 
   const createDebt = useCallback(
     async (data: CreateDebtInput): Promise<number> => {
-      ensureDatabaseInitialized();
       const now = new Date().toISOString();
       const dateString = data.date || now.split("T")[0];
 
@@ -284,7 +282,6 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
 
   const updateDebt = useCallback(
     async (id: number, data: UpdateDebtInput) => {
-      ensureDatabaseInitialized();
       const now = new Date().toISOString();
 
       const existingDebt = debts.find((d) => d.id === id);
@@ -396,7 +393,6 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
 
   const deleteDebt = useCallback(
     async (id: number): Promise<void> => {
-      ensureDatabaseInitialized();
 
       // Delete all linked transactions, debt logs, and the debt record atomically
       // Dynamic SQL aggregation automatically reverts balances across all involved accounts!
@@ -419,7 +415,6 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
 
   const recordRepayment = useCallback(
     async (data: RecordRepaymentInput) => {
-      ensureDatabaseInitialized();
       const now = new Date().toISOString();
       const dateString = data.date || now.split("T")[0];
 
@@ -484,7 +479,6 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
 
   const settleDebtManually = useCallback(
     async (id: number, note?: string) => {
-      ensureDatabaseInitialized();
       const debt = debts.find((d) => d.id === id);
       if (!debt) return;
 
@@ -517,7 +511,6 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
 
   const toggleSettleManually = useCallback(
     async (id: number) => {
-      ensureDatabaseInitialized();
       const debt = debts.find((d) => d.id === id);
       if (!debt) return;
 
@@ -566,7 +559,6 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
   );
 
   const getDebtLogs = useCallback((debtId: number): DebtLogItem[] => {
-    ensureDatabaseInitialized();
     try {
       const rows = expoDb.getAllSync<DebtLogItem>(
         `SELECT id, debt_id as debtId, type, old_amount as oldAmount, new_amount as newAmount, note, created_at as createdAt 
@@ -583,7 +575,6 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getDebtTransactions = useCallback((debtId: number): DebtTransactionItem[] => {
-    ensureDatabaseInitialized();
     try {
       const rows = expoDb.getAllSync<DebtTransactionItem>(
         `SELECT 
@@ -607,7 +598,6 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
 
   const deleteDebtPayment = useCallback(
     async (txId: number, debtId: number) => {
-      ensureDatabaseInitialized();
       expoDb.withTransactionSync(() => {
         db.delete(schema.transactions).where(eq(schema.transactions.id, txId)).run();
 
