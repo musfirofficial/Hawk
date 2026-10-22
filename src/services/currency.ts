@@ -35,6 +35,15 @@ export function formatCurrency(
   numberFormat?: string | null
 ): string {
   const symbol = getCurrencySymbol(currencyCode);
+  const needsSpace = symbol.length > 1;
+  const symbolPrefix = needsSpace ? `${symbol} ` : symbol;
+
+  if (!Number.isFinite(amount)) {
+    return numberFormat === "DOT_COMMA"
+      ? `${symbolPrefix}0,00`
+      : `${symbolPrefix}0.00`;
+  }
+
   const isNegative = amount < 0;
   const absAmount = Math.abs(amount || 0);
 
@@ -53,10 +62,6 @@ export function formatCurrency(
     integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     formattedNumber = `${integerPart}.${decimalPart}`;
   }
-
-  // Spacing for multi-character symbols like "Rs", "د.إ", "Fr"
-  const needsSpace = symbol.length > 1;
-  const symbolPrefix = needsSpace ? `${symbol} ` : symbol;
 
   return isNegative
     ? `-${symbolPrefix}${formattedNumber}`

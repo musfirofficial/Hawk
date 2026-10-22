@@ -1,8 +1,10 @@
+import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 const PIN_KEY = "hawk_secure_pin";
 const RECOVERY_KEY = "hawk_secure_recovery_key";
+const PIN_SALT = "hawk_pin_salt_v1";
 
 // In-memory fallback for web environment where SecureStore is not supported
 const memoryFallback: Record<string, string> = {};
@@ -16,11 +18,19 @@ async function isSecureStoreAvailable(): Promise<boolean> {
   }
 }
 
+async function hashPin(pin: string): Promise<string> {
+  return await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    `${PIN_SALT}:${pin}`
+  );
+}
+
 export async function saveSecurePin(pin: string): Promise<void> {
+  const hashedPin = await hashPin(pin);
   if (await isSecureStoreAvailable()) {
-    await SecureStore.setItemAsync(PIN_KEY, pin);
+    await SecureStore.setItemAsync(PIN_KEY, hashedPin);
   } else {
-    memoryFallback[PIN_KEY] = pin;
+    memoryFallback[PIN_KEY] = hashedPin;
   }
 }
 
@@ -65,12 +75,21 @@ export async function deleteSecureRecoveryKey(): Promise<void> {
 
 export async function hasSecurePin(): Promise<boolean> {
   const pin = await getSecurePin();
-  return Boolean(pin && pin.length === 4);
+  return Boolean(pin && pin.length >= 4);
 }
 
 export async function verifySecurePin(enteredPin: string): Promise<boolean> {
   const stored = await getSecurePin();
-  return Boolean(stored && stored === enteredPin);
+  if (!stored) return false;
+
+  // Backward compatibility: If stored value is legacy 4-digit plaintext, compare directly and upgrade to hash
+  if (stored === enteredPin) {
+    await saveSecurePin(enteredPin);
+    return true;
+  }
+
+  const enteredHash = await hashPin(enteredPin);
+  return stored === enteredHash;
 }
 
 export async function verifySecureRecoveryKey(enteredKey: string): Promise<boolean> {

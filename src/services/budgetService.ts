@@ -134,7 +134,7 @@ export function getMonthBudgetSummary(month: string): MonthBudgetSummary {
     const remaining = diff;
     const progress = roundedBudget > 0 ? Math.round((roundedSpent / roundedBudget) * 100) : 0;
     const isExceeded = roundedSpent > roundedBudget;
-    const isCompleted = roundedBudget > 0 && diff === 0;
+    const isCompleted = roundedBudget > 0 && Math.abs(diff) < 0.005;
 
     const catDetail: BudgetCategoryDetail = {
       id: row.id,
@@ -254,28 +254,31 @@ export function createBudgetWithCategories(params: {
   template?: boolean;
   categories: { categoryId: number; amount: number }[];
 }): number {
+  let budgetId = 0;
 
-  // 1. Insert into budgets
-  expoDb.runSync(`INSERT INTO budgets (name, month, template) VALUES (?, ?, ?);`, [
-    params.name.trim(),
-    params.month,
-    params.template ? 1 : 0,
-  ]);
+  expoDb.withTransactionSync(() => {
+    // 1. Insert into budgets
+    expoDb.runSync(`INSERT INTO budgets (name, month, template) VALUES (?, ?, ?);`, [
+      params.name.trim(),
+      params.month,
+      params.template ? 1 : 0,
+    ]);
 
-  const lastIdRow = expoDb.getFirstSync<{ id: number }>(
-    `SELECT last_insert_rowid() as id;`
-  );
-  const budgetId = lastIdRow?.id || 0;
+    const lastIdRow = expoDb.getFirstSync<{ id: number }>(
+      `SELECT last_insert_rowid() as id;`
+    );
+    budgetId = lastIdRow?.id || 0;
 
-  // 2. Insert category mappings with month
-  for (const cat of params.categories) {
-    if (cat.categoryId > 0 && cat.amount > 0) {
-      expoDb.runSync(
-        `INSERT INTO budget_categories (budget_id, category_id, month, amount) VALUES (?, ?, ?, ?);`,
-        [budgetId, cat.categoryId, params.month, cat.amount]
-      );
+    // 2. Insert category mappings with month
+    for (const cat of params.categories) {
+      if (cat.categoryId > 0 && cat.amount > 0) {
+        expoDb.runSync(
+          `INSERT INTO budget_categories (budget_id, category_id, month, amount) VALUES (?, ?, ?, ?);`,
+          [budgetId, cat.categoryId, params.month, cat.amount]
+        );
+      }
     }
-  }
+  });
 
   return budgetId;
 }
@@ -292,27 +295,28 @@ export function updateBudgetWithCategories(
     categories: { categoryId: number; amount: number }[];
   }
 ) {
+  expoDb.withTransactionSync(() => {
+    // 1. Update budget name, month, and template
+    expoDb.runSync(
+      `UPDATE budgets SET name = ?, month = ?, template = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;`,
+      [params.name.trim(), params.month, params.template ? 1 : 0, budgetId]
+    );
 
-  // 1. Update budget name, month, and template
-  expoDb.runSync(
-    `UPDATE budgets SET name = ?, month = ?, template = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;`,
-    [params.name.trim(), params.month, params.template ? 1 : 0, budgetId]
-  );
+    // 2. Clear old category mappings for this budget
+    expoDb.runSync(`DELETE FROM budget_categories WHERE budget_id = ?;`, [
+      budgetId,
+    ]);
 
-  // 2. Clear old category mappings for this budget
-  expoDb.runSync(`DELETE FROM budget_categories WHERE budget_id = ?;`, [
-    budgetId,
-  ]);
-
-  // 3. Re-insert category mappings with updated month
-  for (const cat of params.categories) {
-    if (cat.categoryId > 0 && cat.amount > 0) {
-      expoDb.runSync(
-        `INSERT INTO budget_categories (budget_id, category_id, month, amount) VALUES (?, ?, ?, ?);`,
-        [budgetId, cat.categoryId, params.month, cat.amount]
-      );
+    // 3. Re-insert category mappings with updated month
+    for (const cat of params.categories) {
+      if (cat.categoryId > 0 && cat.amount > 0) {
+        expoDb.runSync(
+          `INSERT INTO budget_categories (budget_id, category_id, month, amount) VALUES (?, ?, ?, ?);`,
+          [budgetId, cat.categoryId, params.month, cat.amount]
+        );
+      }
     }
-  }
+  });
 }
 
 /**
@@ -447,7 +451,7 @@ export function getBudgetDetailById(id: number): BudgetDetail | null {
     totalSpent += spentAmount;
 
     const isExceeded = spentAmount > budgetAmount;
-    const isCompleted = budgetAmount > 0 && diff === 0;
+    const isCompleted = budgetAmount > 0 && Math.abs(diff) < 0.005;
 
     return {
       id: cat.id,
@@ -532,10 +536,12 @@ export function addCategoryToExistingBudget(
     `SELECT month FROM budgets WHERE id = ?;`,
     [budgetId]
   );
-  const month = bRow?.month || new Date().toISOString().slice(0, 7);
+  if (!bRow) {
+    throw new Error(`Budget with id ${budgetId} not found.`);
+  }
   expoDb.runSync(
     `INSERT INTO budget_categories (budget_id, category_id, month, amount) VALUES (?, ?, ?, ?);`,
-    [budgetId, categoryId, month, amount]
+    [budgetId, categoryId, bRow.month, amount]
   );
 }
 
@@ -543,10 +549,12 @@ export function addCategoryToExistingBudget(
  * Deletes a budget and all its category mappings.
  */
 export function deleteBudget(budgetId: number) {
-  expoDb.runSync(`DELETE FROM budget_categories WHERE budget_id = ?;`, [
-    budgetId,
-  ]);
-  expoDb.runSync(`DELETE FROM budgets WHERE id = ?;`, [budgetId]);
+  expoDb.withTransactionSync(() => {
+    expoDb.runSync(`DELETE FROM budget_categories WHERE budget_id = ?;`, [
+      budgetId,
+    ]);
+    expoDb.runSync(`DELETE FROM budgets WHERE id = ?;`, [budgetId]);
+  });
 }
 
 /**
@@ -744,6 +752,10 @@ export function copyMonthBudgets(sourceMonth: string, targetMonth: string) {
     for (const b of srcBudgets) {
       const cats = catMap.get(b.id) || [];
       const newCats = cats.filter((cat) => !existingCatIds.has(cat.category_id));
+
+      if (newCats.length === 0) {
+        continue;
+      }
 
       expoDb.runSync(
         `INSERT INTO budgets (name, month, template) VALUES (?, ?, ?);`,

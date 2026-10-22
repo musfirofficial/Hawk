@@ -373,8 +373,8 @@ export function ProfileForm({
             activeOpacity={0.7}
             className="flex-row items-center p-4 bg-dark-card rounded-2xl border border-dark-border active:bg-dark-cardHover"
           >
-            <View className="w-10 h-10 rounded-xl bg-brand-accent/10 items-center justify-center mr-3.5 border border-brand-accent/20">
-              <Ionicons name="camera" size={20} color="#D4F938" />
+            <View className="w-10 h-10 rounded-xl bg-dark-surface items-center justify-center mr-3.5 border border-dark-border">
+              <Ionicons name="camera-outline" size={20} color="#F8FAFC" />
             </View>
             <View className="flex-1">
               <Text className="text-dark-text font-bold text-sm">Take Photo</Text>
@@ -388,8 +388,8 @@ export function ProfileForm({
             activeOpacity={0.7}
             className="flex-row items-center p-4 bg-dark-card rounded-2xl border border-dark-border active:bg-dark-cardHover"
           >
-            <View className="w-10 h-10 rounded-xl bg-brand-transfer/10 items-center justify-center mr-3.5 border border-brand-transfer/20">
-              <Ionicons name="images" size={20} color="#38BDF8" />
+            <View className="w-10 h-10 rounded-xl bg-dark-surface items-center justify-center mr-3.5 border border-dark-border">
+              <Ionicons name="images-outline" size={20} color="#F8FAFC" />
             </View>
             <View className="flex-1">
               <Text className="text-dark-text font-bold text-sm">Choose from Gallery</Text>

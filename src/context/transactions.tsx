@@ -275,31 +275,41 @@ export function TransactionsProvider({
 
   const deleteTransaction = useCallback(
     async (id: number) => {
+      // Look up transaction directly from DB to avoid stale React state
+      const txRow = expoDb.getFirstSync<{
+        id: number;
+        type: string;
+        debt_id: number | null;
+      }>(`SELECT id, type, debt_id FROM transactions WHERE id = ?;`, [id]);
 
-      const tx = transactions.find((t) => t.id === id);
+      if (!txRow) {
+        return;
+      }
 
-      if (tx && tx.debtId) {
-        if (tx.type === "LEND" || tx.type === "BORROW") {
+      const debtId = txRow.debt_id;
+
+      if (debtId) {
+        if (txRow.type === "LEND" || txRow.type === "BORROW") {
           // Initial loan transaction: delete in reverse dependency order inside a transaction
           // Order matters for the DB change listener: debtLogs → debts → transactions
           // to prevent the listener from seeing a partially-deleted state
           expoDb.withTransactionSync(() => {
             db.delete(schema.debtLogs)
-              .where(eq(schema.debtLogs.debtId, tx.debtId!))
+              .where(eq(schema.debtLogs.debtId, debtId))
               .run();
 
             db.delete(schema.debts)
-              .where(eq(schema.debts.id, tx.debtId!))
+              .where(eq(schema.debts.id, debtId))
               .run();
 
             db.delete(schema.transactions)
-              .where(eq(schema.transactions.debtId, tx.debtId!))
+              .where(eq(schema.transactions.debtId, debtId))
               .run();
           });
 
           loadData();
           return;
-        } else if (tx.type === "DEBT PAID" || tx.type === "DEBT RECEIVED") {
+        } else if (txRow.type === "DEBT PAID" || txRow.type === "DEBT RECEIVED") {
           // Repayment transaction: delete and recalculate remaining debt balance atomically
           expoDb.withTransactionSync(() => {
             db.delete(schema.transactions)
@@ -308,15 +318,13 @@ export function TransactionsProvider({
 
             const sumRow = expoDb.getFirstSync<{ repaid: number }>(
               `SELECT SUM(amount) as repaid FROM transactions WHERE debt_id = ? AND (type = 'DEBT PAID' OR type = 'DEBT RECEIVED');`,
-              [tx.debtId]
+              [debtId]
             );
             const repaid = Number(sumRow?.repaid) || 0;
             const debtRow = expoDb.getFirstSync<{
               amount: number;
               state: string;
-            }>(`SELECT amount, state FROM debts WHERE id = ?;`, [
-              tx.debtId,
-            ]);
+            }>(`SELECT amount, state FROM debts WHERE id = ?;`, [debtId]);
 
             if (debtRow && debtRow.state !== "WRITTEN_OFF") {
               const isSettled = repaid >= debtRow.amount;
@@ -328,7 +336,7 @@ export function TransactionsProvider({
                   settledNote: isSettled ? undefined : null,
                   updatedAt: now,
                 })
-                .where(eq(schema.debts.id, tx.debtId!))
+                .where(eq(schema.debts.id, debtId))
                 .run();
             }
           });
@@ -344,7 +352,7 @@ export function TransactionsProvider({
 
       loadData();
     },
-    [transactions, loadData]
+    [loadData]
   );
 
   const incomeCategories = useMemo(

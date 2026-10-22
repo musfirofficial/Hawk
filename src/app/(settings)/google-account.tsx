@@ -24,7 +24,6 @@ export default function GoogleAccountScreen() {
       router.back();
     } catch (err) {
       console.error("Failed to disconnect Google account:", err);
-    } finally {
       setDisconnecting(false);
     }
   }

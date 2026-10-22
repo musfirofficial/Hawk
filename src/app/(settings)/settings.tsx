@@ -27,7 +27,6 @@ export default function SettingsScreen() {
     settings,
     hasPin,
     connectGoogle,
-    signInWithGoogle,
     updateSecuritySettings,
     isGoogleAuthEnabled,
   } = useAuth();
@@ -183,12 +182,12 @@ export default function SettingsScreen() {
         cancelText: "Cancel",
         onConfirm: async () => {
           try {
-            const user = await signInWithGoogle();
+            const user = await connectGoogle();
             if (user) {
               router.push("/backup-restore" as any);
             }
           } catch (e: any) {
-            console.warn("Google sign-in failed:", e);
+            console.warn("Google connect failed:", e);
           }
         },
       });

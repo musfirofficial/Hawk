@@ -244,20 +244,22 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
     async (id: number, force?: boolean): Promise<{ archived: boolean }> => {
 
       if (force) {
-        // Force delete: clean up linked transactions first to avoid foreign key constraints
-        db.delete(schema.transactions)
-          .where(
-            or(
-              eq(schema.transactions.fromAssetId, id),
-              eq(schema.transactions.toAssetId, id)
+        // Force delete: clean up linked transactions first to avoid foreign key constraints atomically
+        expoDb.withTransactionSync(() => {
+          db.delete(schema.transactions)
+            .where(
+              or(
+                eq(schema.transactions.fromAssetId, id),
+                eq(schema.transactions.toAssetId, id)
+              )
             )
-          )
-          .run();
+            .run();
 
-        // Permanently delete account record
-        db.delete(schema.liquidAssets)
-          .where(eq(schema.liquidAssets.id, id))
-          .run();
+          // Permanently delete account record
+          db.delete(schema.liquidAssets)
+            .where(eq(schema.liquidAssets.id, id))
+            .run();
+        });
 
         loadAccounts();
         return { archived: false };

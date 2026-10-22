@@ -438,9 +438,10 @@ export default function DedicatedDebtScreen() {
   }
 
   function handleConfirmAccount() {
-    if (tempAssetId) {
-      if (currentMode === "create") setCreateAssetId(tempAssetId);
-      else if (currentMode === "payment") setSelectedPaymentAssetId(tempAssetId);
+    if (currentMode === "create") {
+      setCreateAssetId(tempAssetId);
+    } else if (currentMode === "payment") {
+      if (tempAssetId) setSelectedPaymentAssetId(tempAssetId);
     }
     setIsAccountSheetOpen(false);
   }
@@ -786,19 +787,8 @@ export default function DedicatedDebtScreen() {
       return;
     }
 
-    if (!createAssetId) {
-      const fieldName =
-        createType === "LEND" ? "Paid From account" : "Deposit To account";
-      showAlert({
-        title: "Account Required",
-        message: `Please select a ${fieldName}.`,
-        type: "danger",
-      });
-      return;
-    }
-
-    // Check account balance if Lent
-    if (createType === "LEND") {
+    // Check account balance only if an account was selected and type is Lent
+    if (createType === "LEND" && createAssetId) {
       const acct = accounts.find((a) => a.id === createAssetId);
       if (acct && parsed > acct.currentBalance) {
         showAlert({
@@ -1363,11 +1353,7 @@ export default function DedicatedDebtScreen() {
                 label={createType === "LEND" ? "Paid From" : "Deposit To"}
                 icon="wallet-outline"
                 value={selectedAccount?.name}
-                placeholder={
-                  createType === "LEND"
-                    ? "Select payment account"
-                    : "Select deposit account"
-                }
+                placeholder="Optional (Prior loan / No account)"
                 onPress={openAccountSheet}
               />
 
@@ -1896,8 +1882,49 @@ export default function DedicatedDebtScreen() {
           })}
         </View>
 
+        {/* Optional No Account / Prior Loan Card for Create Mode */}
+        {currentMode === "create" ? (
+          <TouchableOpacity
+            onPress={() => setTempAssetId(null)}
+            activeOpacity={0.7}
+            className={`flex-row items-center justify-between p-3.5 rounded-2xl mb-3 border ${
+              tempAssetId === null
+                ? "bg-brand-accent/10 border-brand-accent"
+                : "bg-dark-card/50 border-dark-border"
+            }`}
+          >
+            <View className="flex-row items-center gap-3">
+              <View className="w-10 h-10 rounded-xl bg-dark-surface border border-dark-border items-center justify-center">
+                <Ionicons
+                  name="ban-outline"
+                  size={18}
+                  color={tempAssetId === null ? "#D4F938" : "#94A3B8"}
+                />
+              </View>
+              <View>
+                <Text
+                  className={`text-sm font-bold font-sans ${
+                    tempAssetId === null
+                      ? "text-brand-accent"
+                      : "text-dark-text"
+                  }`}
+                >
+                  No Account (Prior / External)
+                </Text>
+                <Text className="text-dark-muted text-[11px] font-sans">
+                  Does not deduct from current account balances
+                </Text>
+              </View>
+            </View>
+
+            {tempAssetId === null ? (
+              <Ionicons name="checkmark-circle" size={18} color="#D4F938" />
+            ) : null}
+          </TouchableOpacity>
+        ) : null}
+
         {accounts.filter((a) => a.assetType === accountTypeTab).length === 0 ? (
-          <View className="py-8 items-center justify-center">
+          <View className="py-6 items-center justify-center">
             <View className="w-12 h-12 rounded-full bg-dark-surface border border-dark-border items-center justify-center mb-3">
               <Ionicons
                 name={
@@ -1939,82 +1966,80 @@ export default function DedicatedDebtScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <>
-            <ScrollView
-              className="max-h-[300px]"
-              showsVerticalScrollIndicator={false}
-            >
-              {accounts
-                .filter((a) => a.assetType === accountTypeTab)
-                .map((acc) => {
-                  const isSelected = tempAssetId === acc.id;
+          <ScrollView
+            className="max-h-[300px]"
+            showsVerticalScrollIndicator={false}
+          >
+            {accounts
+              .filter((a) => a.assetType === accountTypeTab)
+              .map((acc) => {
+                const isSelected = tempAssetId === acc.id;
 
-                  return (
-                    <TouchableOpacity
-                      key={acc.id}
-                      onPress={() => setTempAssetId(acc.id)}
-                      activeOpacity={0.7}
-                      className={`flex-row items-center justify-between p-3.5 rounded-2xl mb-2 border ${
-                        isSelected
-                          ? "bg-brand-accent/10 border-brand-accent"
-                          : "bg-dark-card/50 border-dark-border"
-                      }`}
-                    >
-                      <View className="flex-row items-center gap-3">
-                        <View className="w-10 h-10 rounded-xl bg-dark-surface border border-dark-border items-center justify-center">
-                          <Ionicons
-                            name={
-                              acc.assetType === "BANK" ? "business" : "wallet"
-                            }
-                            size={18}
-                            color={isSelected ? "#D4F938" : "#94A3B8"}
-                          />
-                        </View>
-                        <View>
-                          <Text
-                            className={`text-sm font-bold font-sans ${
-                              isSelected
-                                ? "text-brand-accent"
-                                : "text-dark-text"
-                            }`}
-                          >
-                            {acc.name}
-                          </Text>
-                          {acc.accountNumber ? (
-                            <Text className="text-dark-muted text-[11px] font-sans">
-                              {acc.accountNumber}
-                            </Text>
-                          ) : null}
-                        </View>
+                return (
+                  <TouchableOpacity
+                    key={acc.id}
+                    onPress={() => setTempAssetId(isSelected ? null : acc.id)}
+                    activeOpacity={0.7}
+                    className={`flex-row items-center justify-between p-3.5 rounded-2xl mb-2 border ${
+                      isSelected
+                        ? "bg-brand-accent/10 border-brand-accent"
+                        : "bg-dark-card/50 border-dark-border"
+                    }`}
+                  >
+                    <View className="flex-row items-center gap-3">
+                      <View className="w-10 h-10 rounded-xl bg-dark-surface border border-dark-border items-center justify-center">
+                        <Ionicons
+                          name={
+                            acc.assetType === "BANK" ? "business" : "wallet"
+                          }
+                          size={18}
+                          color={isSelected ? "#D4F938" : "#94A3B8"}
+                        />
                       </View>
-
-                      <View className="items-end">
-                        <Text className="text-sm font-bold text-dark-text font-sans">
-                          {formatCurrency(
-                            acc.currentBalance ?? 0,
-                            settings?.currency,
-                            settings?.numberFormat,
-                          )}
+                      <View>
+                        <Text
+                          className={`text-sm font-bold font-sans ${
+                            isSelected
+                              ? "text-brand-accent"
+                              : "text-dark-text"
+                          }`}
+                        >
+                          {acc.name}
                         </Text>
+                        {acc.accountNumber ? (
+                          <Text className="text-dark-muted text-[11px] font-sans">
+                            {acc.accountNumber}
+                          </Text>
+                        ) : null}
                       </View>
-                    </TouchableOpacity>
-                  );
-                })}
-            </ScrollView>
+                    </View>
 
-            <View className="mt-4">
-              <TouchableOpacity
-                onPress={handleConfirmAccount}
-                activeOpacity={0.8}
-                className="w-full py-3.5 rounded-2xl items-center justify-center bg-brand-accent"
-              >
-                <Text className="text-dark-bg font-bold text-base font-sans">
-                  Done
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </>
+                    <View className="items-end">
+                      <Text className="text-sm font-bold text-dark-text font-sans">
+                        {formatCurrency(
+                          acc.currentBalance ?? 0,
+                          settings?.currency,
+                          settings?.numberFormat,
+                        )}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+          </ScrollView>
         )}
+
+        <View className="mt-4">
+          <TouchableOpacity
+            onPress={handleConfirmAccount}
+            activeOpacity={0.8}
+            className="w-full py-3.5 rounded-2xl items-center justify-center bg-brand-accent"
+          >
+            <Text className="text-dark-bg font-bold text-base font-sans">
+              Done
+            </Text>
+          </TouchableOpacity>
+        </View>
       </HawkFlyUp>
 
       {/* --- FLY-UP 2: Universal Contact Selection Grid (Exact match with TransactionForm) --- */}

@@ -215,24 +215,31 @@ export function ensureDatabaseInitialized() {
         tableInfo?.sql &&
         /name\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i.test(tableInfo.sql)
       ) {
-        expoDb.execSync(`
-          PRAGMA foreign_keys = OFF;
-          CREATE TABLE IF NOT EXISTS contacts_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            name TEXT NOT NULL,
-            mobile_number TEXT,
-            note TEXT,
-            avatar_svg TEXT,
-            is_archived INTEGER DEFAULT 0 NOT NULL,
-            created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
-            updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
-          );
-          INSERT INTO contacts_new (id, name, mobile_number, note, avatar_svg, is_archived, created_at, updated_at)
-          SELECT id, name, mobile_number, note, avatar_svg, is_archived, created_at, updated_at FROM contacts;
-          DROP TABLE contacts;
-          ALTER TABLE contacts_new RENAME TO contacts;
-          PRAGMA foreign_keys = ON;
-        `);
+        try {
+          expoDb.execSync("PRAGMA foreign_keys = OFF;");
+          expoDb.withTransactionSync(() => {
+            expoDb.execSync(`
+              CREATE TABLE IF NOT EXISTS contacts_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name TEXT NOT NULL,
+                mobile_number TEXT,
+                note TEXT,
+                avatar_svg TEXT,
+                is_archived INTEGER DEFAULT 0 NOT NULL,
+                created_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+                updated_at TEXT DEFAULT (CURRENT_TIMESTAMP) NOT NULL
+              );
+            `);
+            expoDb.execSync(`
+              INSERT INTO contacts_new (id, name, mobile_number, note, avatar_svg, is_archived, created_at, updated_at)
+              SELECT id, name, mobile_number, note, avatar_svg, is_archived, created_at, updated_at FROM contacts;
+            `);
+            expoDb.execSync("DROP TABLE contacts;");
+            expoDb.execSync("ALTER TABLE contacts_new RENAME TO contacts;");
+          });
+        } finally {
+          expoDb.execSync("PRAGMA foreign_keys = ON;");
+        }
       }
     } catch (err) {
       console.error("Migration error updating contacts table unique constraint:", err);

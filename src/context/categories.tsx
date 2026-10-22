@@ -176,8 +176,17 @@ export function CategoriesProvider({
       );
       const hasTransactions = Boolean(checkRow && checkRow.count > 0);
 
-      // Delete category
-      db.delete(schema.categories).where(eq(schema.categories.id, id)).run();
+      // Atomically clean up references and delete category
+      expoDb.withTransactionSync(() => {
+        db.update(schema.transactions)
+          .set({ categoryId: null, updatedAt: new Date().toISOString() })
+          .where(eq(schema.transactions.categoryId, id))
+          .run();
+
+        expoDb.runSync(`DELETE FROM budget_categories WHERE category_id = ?;`, [id]);
+
+        db.delete(schema.categories).where(eq(schema.categories.id, id)).run();
+      });
 
       loadData();
       return { success: true, hasTransactions };

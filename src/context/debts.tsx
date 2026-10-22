@@ -60,7 +60,7 @@ export interface CreateDebtInput {
   contactId: number;
   type: DebtType;
   amount: number;
-  assetId: number; // Required account to deduct or credit from
+  assetId?: number | null; // Optional account to deduct or credit from (null for prior/external loans)
   date?: string;
   time?: string;
   dueDate?: string | null;
@@ -302,9 +302,15 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
 
       if (data.amount !== undefined) {
         const newAmount = Number(data.amount) || 0;
-        if (existingDebt && newAmount < existingDebt.repaidAmount) {
+        const repaidRow = expoDb.getFirstSync<{ repaid: number }>(
+          `SELECT SUM(amount) as repaid FROM transactions WHERE debt_id = ? AND (type = 'DEBT PAID' OR type = 'DEBT RECEIVED');`,
+          [id]
+        );
+        const actualRepaid = Number(repaidRow?.repaid) || 0;
+
+        if (newAmount < actualRepaid) {
           throw new Error(
-            `Amount cannot be less than the already repaid amount (${existingDebt.repaidAmount})`
+            `Amount cannot be less than the already repaid amount (${actualRepaid})`
           );
         }
         updateValues.amount = newAmount;
@@ -324,10 +330,10 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
         }
 
         // If new amount is fully covered by repayments, mark as settled
-        if (existingDebt && newAmount <= existingDebt.repaidAmount) {
+        if (newAmount <= actualRepaid) {
           updateValues.state = "REPAID";
           updateValues.settledAt = now;
-        } else if (existingDebt && existingDebt.state === "REPAID" && newAmount > existingDebt.repaidAmount) {
+        } else if (existingDebt && existingDebt.state === "REPAID" && newAmount > actualRepaid) {
           updateValues.state = "ONGOING";
           updateValues.settledAt = null;
         }
@@ -443,34 +449,46 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
         createdAtTimestamp = localDateTimeToIso(data.date, data.time);
       }
 
-      db.insert(schema.transactions)
-        .values({
-          amount: Number(data.amount) || 0,
-          type: txType,
-          toAssetId: isLend ? data.assetId : null,
-          fromAssetId: !isLend ? data.assetId : null,
-          contactId: debt.contactId,
-          debtId: debt.id,
-          date: dateString,
-          note: data.note?.trim() || (isLend ? "Debt Repayment Received" : "Debt Repayment Paid"),
-          createdAt: createdAtTimestamp,
-          updatedAt: now,
-        })
-        .run();
-
-      // Check if this repayment settles the debt
-      const newRepaid = debt.repaidAmount + Number(data.amount);
-      if (newRepaid >= debt.amount) {
-        db.update(schema.debts)
-          .set({
-            state: "REPAID",
-            settledAt: now,
-            settledNote: null,
+      expoDb.withTransactionSync(() => {
+        db.insert(schema.transactions)
+          .values({
+            amount: Number(data.amount) || 0,
+            type: txType,
+            toAssetId: isLend ? data.assetId : null,
+            fromAssetId: !isLend ? data.assetId : null,
+            contactId: debt.contactId,
+            debtId: debt.id,
+            date: dateString,
+            note: data.note?.trim() || (isLend ? "Debt Repayment Received" : "Debt Repayment Paid"),
+            createdAt: createdAtTimestamp,
             updatedAt: now,
           })
-          .where(eq(schema.debts.id, debt.id))
           .run();
-      }
+
+        // Check if this repayment settles the debt via actual DB sum
+        const sumRow = expoDb.getFirstSync<{ repaid: number }>(
+          `SELECT SUM(amount) as repaid FROM transactions WHERE debt_id = ? AND (type = 'DEBT PAID' OR type = 'DEBT RECEIVED');`,
+          [debt.id]
+        );
+        const totalRepaid = Number(sumRow?.repaid) || 0;
+        const debtRow = expoDb.getFirstSync<{ amount: number }>(
+          `SELECT amount FROM debts WHERE id = ?;`,
+          [debt.id]
+        );
+        const debtTotal = debtRow ? debtRow.amount : debt.amount;
+
+        if (totalRepaid >= debtTotal) {
+          db.update(schema.debts)
+            .set({
+              state: "REPAID",
+              settledAt: now,
+              settledNote: null,
+              updatedAt: now,
+            })
+            .where(eq(schema.debts.id, debt.id))
+            .run();
+        }
+      });
 
       loadDebts();
     },
@@ -517,41 +535,52 @@ export function DebtsProvider({ children }: { children: React.ReactNode }) {
       const isCurrentlyWrittenOff = debt.state === "WRITTEN_OFF";
       const now = new Date().toISOString();
 
-      if (!isCurrentlyWrittenOff) {
-        db.insert(schema.debtLogs)
-          .values({
-            debtId: id,
-            type: "SETTLED_MANUALLY",
-            note: "Written off",
-            createdAt: now,
-          })
-          .run();
-      } else {
-        db.insert(schema.debtLogs)
-          .values({
-            debtId: id,
-            type: "REOPENED",
-            note: "Debt reopened",
-            createdAt: now,
-          })
-          .run();
-      }
+      expoDb.withTransactionSync(() => {
+        if (!isCurrentlyWrittenOff) {
+          db.insert(schema.debtLogs)
+            .values({
+              debtId: id,
+              type: "SETTLED_MANUALLY",
+              note: "Written off",
+              createdAt: now,
+            })
+            .run();
+        } else {
+          db.insert(schema.debtLogs)
+            .values({
+              debtId: id,
+              type: "REOPENED",
+              note: "Debt reopened",
+              createdAt: now,
+            })
+            .run();
+        }
 
-      const nextState = isCurrentlyWrittenOff
-        ? debt.remainingAmount <= 0
-          ? "REPAID"
-          : "ONGOING"
-        : "WRITTEN_OFF";
+        let nextState: "WRITTEN_OFF" | "REPAID" | "ONGOING" = "WRITTEN_OFF";
+        if (isCurrentlyWrittenOff) {
+          const sumRow = expoDb.getFirstSync<{ repaid: number }>(
+            `SELECT SUM(amount) as repaid FROM transactions WHERE debt_id = ? AND (type = 'DEBT PAID' OR type = 'DEBT RECEIVED');`,
+            [id]
+          );
+          const repaid = Number(sumRow?.repaid) || 0;
+          const debtRow = expoDb.getFirstSync<{ amount: number }>(
+            `SELECT amount FROM debts WHERE id = ?;`,
+            [id]
+          );
+          const totalAmount = debtRow?.amount ?? debt.amount;
+          nextState = repaid >= totalAmount ? "REPAID" : "ONGOING";
+        }
 
-      db.update(schema.debts)
-        .set({
-          state: nextState,
-          settledAt: !isCurrentlyWrittenOff ? now : null,
-          settledNote: !isCurrentlyWrittenOff ? "Written off" : null,
-          updatedAt: now,
-        })
-        .where(eq(schema.debts.id, id))
-        .run();
+        db.update(schema.debts)
+          .set({
+            state: nextState,
+            settledAt: !isCurrentlyWrittenOff ? now : (nextState === "REPAID" ? now : null),
+            settledNote: !isCurrentlyWrittenOff ? "Written off" : null,
+            updatedAt: now,
+          })
+          .where(eq(schema.debts.id, id))
+          .run();
+      });
 
       loadDebts();
     },
