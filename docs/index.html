@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hawk-Finance - Private Financial Ledger</title>
+  <style>
+    :root {
+      --bg: #0B0D12;
+      --card-bg: #141721;
+      --text-main: #F3F4F6;
+      --text-muted: #9CA3AF;
+      --accent: #D4F938;
+      --border: #232838;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 60px 20px;
+    }
+    .hero {
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 14px;
+      background: rgba(212, 249, 56, 0.1);
+      border: 1px solid rgba(212, 249, 56, 0.3);
+      color: var(--accent);
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 2.75rem;
+      font-weight: 800;
+      color: #FFFFFF;
+      margin-bottom: 16px;
+      letter-spacing: -0.025em;
+    }
+    p.subtitle {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      margin-bottom: 36px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .grid {
+      max-width: 800px;
+      margin: 0 auto 50px auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: left;
+    }
+    .card h3 {
+      font-size: 1.1rem;
+      color: #FFFFFF;
+      margin-bottom: 8px;
+    }
+    .card p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 0;
+    }
+    .links-section {
+      max-width: 800px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .links-section a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      margin: 0 16px;
+    }
+    .links-section a:hover {
+      text-decoration: underline;
+    }
+    footer {
+      max-width: 800px;
+      margin: 40px auto 0 auto;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div class="badge">Offline-First &bull; Zero Tracking</div>
+    <h1>Hawk-Finance</h1>
+    <p class="subtitle">
+      A private, luxury personal finance ledger, debt management system, and monthly budgeting tool for mobile.
+    </p>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>🔒 100% Offline-First</h3>
+      <p>All accounts, transactions, and debts live locally on your device in a secure SQLite database.</p>
+    </div>
+    <div class="card">
+      <h3>🤝 Debt & Loan Tracking</h3>
+      <p>Easily track money lent to or borrowed from contacts with live repayment progress bars.</p>
+    </div>
+    <div class="card">
+      <h3>☁️ Private Cloud Backup</h3>
+      <p>Direct encrypted database backup to your personal Google Drive appDataFolder with zero middleman servers.</p>
+    </div>
+  </div>
+
+  <div class="links-section">
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="https://github.com/musfirofficial/Hawk" target="_blank" rel="noopener noreferrer">Source Code & GitHub</a>
+  </div>
+
+  <footer>
+    &copy; 2026 Hawk-Finance. Built with privacy as the core foundation.
+  </footer>
+</body>
+</html>

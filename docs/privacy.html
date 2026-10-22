@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Hawk-Finance</title>
+  <style>
+    :root {
+      --bg: #0B0D12;
+      --card-bg: #141721;
+      --text-main: #F3F4F6;
+      --text-muted: #9CA3AF;
+      --accent: #D4F938;
+      --border: #232838;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 8px;
+      color: #FFFFFF;
+    }
+    .app-title {
+      color: var(--accent);
+      font-weight: 600;
+      margin-bottom: 24px;
+      display: inline-block;
+    }
+    .updated {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+    h2 {
+      font-size: 1.25rem;
+      margin-top: 28px;
+      margin-bottom: 12px;
+      color: #FFFFFF;
+      border-left: 3px solid var(--accent);
+      padding-left: 10px;
+    }
+    p, li {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 12px;
+    }
+    ul {
+      margin-left: 20px;
+      margin-bottom: 16px;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+    .highlight-box {
+      background: #1A1F2E;
+      border: 1px solid #2A334A;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 20px 0;
+    }
+    .highlight-box p {
+      color: #E2E8F0;
+      margin-bottom: 0;
+      font-weight: 500;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Privacy Policy</h1>
+    <div class="app-title">Hawk-Finance Mobile Application</div>
+    <div class="updated">Last Updated: October 22, 2026</div>
+
+    <h2>1. Introduction & Overview</h2>
+    <p>
+      <strong>Hawk-Finance</strong> ("we", "our", or "the App") is an offline-first personal financial ledger, debt tracker, and budgeting mobile application. 
+      Your privacy is our core founding principle. Hawk-Finance is designed to keep your financial data on your own device and in your personal control.
+    </p>
+
+    <h2>2. Offline-First Data Storage</h2>
+    <p>
+      By default, Hawk-Finance stores 100% of your financial records (including liquid asset balances, expenses, income, debt records, and contacts) locally on your device in an encrypted/sandboxed SQLite database.
+    </p>
+    <ul>
+      <li>We do not operate central application servers that collect your financial ledger.</li>
+      <li>We do not track, sell, or monetize your financial activity.</li>
+      <li>No third-party analytics or advertising SDKs are embedded in Hawk-Finance.</li>
+    </ul>
+
+    <h2>3. Google User Data & Google Drive API Disclosure</h2>
+    <p>
+      Hawk-Finance provides an optional <strong>Google Drive Cloud Backup & Restore</strong> feature. If you explicitly choose to connect your Google Account, the App requests permission to the following Google OAuth scope:
+    </p>
+    <ul>
+      <li><code>https://www.googleapis.com/auth/drive.appdata</code> (Application Data Folder)</li>
+    </ul>
+
+    <div class="highlight-box">
+      <p>
+        <strong>Google API Services User Data Policy Compliance:</strong><br>
+        Hawk-Finance's use and transfer to any other app of information received from Google APIs adheres to the 
+        <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements.
+      </p>
+    </div>
+
+    <h3>How We Use Google Drive:</h3>
+    <ul>
+      <li><strong>Specific Purpose Only:</strong> The requested scope is used strictly to upload your local SQLite database snapshot (<code>hawk_backup.db</code>) to your private, hidden Google Drive application data folder and download it when you choose to restore your data.</li>
+      <li><strong>No Access to Personal Drive Files:</strong> The <code>drive.appdata</code> scope is completely isolated. Hawk-Finance cannot see, read, create, or modify any personal documents, spreadsheets, photos, or other files in your personal Google Drive.</li>
+      <li><strong>No Third-Party Sharing:</strong> Your Google authentication tokens and database backup files are never transferred to external servers, developers, or any third party. Data transfer occurs directly between your mobile device and Google's official cloud endpoints over encrypted HTTPS connections.</li>
+      <li><strong>No Human Access:</strong> No humans (including developers) have access to your Google Drive backup files.</li>
+    </ul>
+
+    <h2>4. Hardware Security & Biometrics</h2>
+    <p>
+      Hawk-Finance allows users to set a 4-digit security PIN and enable hardware-backed biometric authentication (Fingerprint, Face ID, Touch ID).
+    </p>
+    <ul>
+      <li>Your security PIN is hashed using SHA-256 with a cryptographic salt and stored in your device's hardware keystore (iOS Keychain / Android KeyStore).</li>
+      <li>Biometric authentication is processed entirely by your phone's operating system hardware. Hawk-Finance never captures, processes, or stores your raw biometric data.</li>
+    </ul>
+
+    <h2>5. Data Retention & Deletion</h2>
+    <ul>
+      <li><strong>Local Data:</strong> You can completely erase your local database at any time by selecting "Reset All Data" in the Settings menu or uninstalling the app.</li>
+      <li><strong>Cloud Backup Deletion:</strong> You can permanently delete your cloud backup file at any time directly within the app by tapping "Delete Cloud Backup" in Backup & Restore settings.</li>
+      <li><strong>Revoking Google Access:</strong> You can revoke Hawk-Finance's access to your Google account at any time via your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Google Account Permissions</a>.</li>
+    </ul>
+
+    <h2>6. Changes to this Privacy Policy</h2>
+    <p>
+      We may update our Privacy Policy from time to time. Any changes will be posted on this page with an updated revision date.
+    </p>
+
+    <h2>7. Contact Us</h2>
+    <p>
+      If you have questions or concerns regarding this Privacy Policy, please contact the developer via GitHub:
+      <br>
+      <a href="https://github.com/musfirofficial/Hawk" target="_blank" rel="noopener noreferrer">https://github.com/musfirofficial/Hawk</a>
+    </p>
+
+    <footer>
+      &copy; 2026 Hawk-Finance. All rights reserved.
+    </footer>
+  </div>
+</body>
+</html>
