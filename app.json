@@ -10,7 +10,7 @@
     "backgroundColor": "#0B0D12",
     "ios": {
       "icon": "./assets/logo/logo.png",
-      "bundleIdentifier": "com.musfir.thahir.Hawk",
+      "bundleIdentifier": "com.musfir.thahir.hawk",
       "infoPlist": {
         "NSFaceIDUsageDescription": "This app uses Face ID to securely log you into your account.",
         "NSPhotoLibraryUsageDescription": "Hawk needs access to your photo library to let you select a profile picture.",
@@ -23,7 +23,7 @@
         "foregroundImage": "./assets/logo/logo.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.musfir.thahir.Hawk",
+      "package": "com.musfir.thahir.hawk",
       "permissions": [
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
