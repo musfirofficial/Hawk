@@ -1,7 +1,5 @@
 # Hawk Security, Cryptography & Authentication System
 
-> **Note**: In compliance with documentation guidelines, all security flows and authorization sequences are documented via ASCII diagrams and structured markdown tables without Mermaid formatting.
-
 This document details the security architecture, cryptographic storage, biometric policies, brute-force mitigation mechanisms, and fine-grained authorization gates implemented in **Hawk**.
 
 ---

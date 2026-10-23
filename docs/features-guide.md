@@ -1,7 +1,5 @@
 # Hawk Core Features & Business Logic Guide
 
-> **Note**: In compliance with documentation guidelines, all workflows and business rules are documented via ASCII diagrams and structured markdown tables without Mermaid formatting.
-
 This document provides a technical and operational breakdown of the core domains and business logic within **Hawk**.
 
 ---

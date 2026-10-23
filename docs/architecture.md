@@ -1,7 +1,5 @@
 # Hawk System Architecture & Runtime Specifications
 
-> **Note**: In compliance with documentation guidelines, all system topologies and sequence workflows are illustrated via ASCII text diagrams without Mermaid formatting.
-
 This document describes the high-level system architecture, component hierarchies, state management patterns, and runtime lifecycle of the **Hawk** personal finance application.
 
 ---

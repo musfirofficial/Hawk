@@ -1,7 +1,5 @@
 # Hawk User Manual & Comprehensive Guide
 
-> **Note**: This manual is written for end users and administrators. In compliance with documentation guidelines, all interface diagrams and process flows are documented using ASCII text formatting without Mermaid diagrams.
-
 Welcome to **Hawk** — your private, offline-first personal financial ledger, debt manager, and budgeting companion.
 
 ---

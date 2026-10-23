@@ -1,7 +1,5 @@
 # Hawk Database Schema & Storage Specifications
 
-> **Note**: In compliance with documentation guidelines, all entity relationships are documented via ASCII diagrams and structured markdown tables without Mermaid formatting.
-
 This document serves as the comprehensive data dictionary and database specification for the **Hawk** application. Hawk uses an embedded SQLite database managed via **Drizzle ORM** (`drizzle-orm/expo-sqlite`) with synchronous schema migration logic.
 
 ---
